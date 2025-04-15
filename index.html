@@ -14,7 +14,7 @@
       padding: 0;
     }
 
-    /* Set background image from background.png located in the repository */
+    /* Background image from background.png located in the repository */
     body {
       background: url("background.png") no-repeat center center fixed;
       background-size: cover;
@@ -236,11 +236,15 @@ Added By: ${establishment.addedBy}`;
       });
     }
 
+    // Global variable to hold the current establishments data
+    let currentEstablishments = [];
+
     // ===================== 4. SUBSCRIBE TO DATABASE UPDATES =====================
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
         const allEstablishments = data ? Object.values(data) : [];
+        currentEstablishments = allEstablishments;
         renderDashboards(allEstablishments);
       });
     }
@@ -325,36 +329,33 @@ Added By: ${establishment.addedBy}`;
     }
 
     // ===================== 6. UPDATE TIMERS =====================
+    // Modified to use the global currentEstablishments array rather than a separate DB query.
     function updateTimers() {
-      db.ref("establishments").once("value", snapshot => {
-        const data = snapshot.val();
-        if (data) {
-          Object.values(data).forEach(est => {
-            if (!est.expired) {
-              const timerTd = document.getElementById("timer-" + est.id);
-              if (timerTd) {
-                const now = new Date();
-                const offlineUntil = new Date(est.offlineUntil);
-                const remainingMs = offlineUntil - now;
-                if (remainingMs > 0) {
-                  const minutes = Math.floor(remainingMs / 60000);
-                  const seconds = Math.floor((remainingMs % 60000) / 1000);
-                  timerTd.textContent = `${minutes} min ${seconds} sec`;
-                } else {
-                  timerTd.textContent = "Time Expired";
-                  db.ref("establishments/" + est.id).update({ expired: true }, error => {
-                    if (!error) {
-                      const text = `Offline time expired for venue: ${est.name}.
+      currentEstablishments.forEach(est => {
+        if (!est.expired) {
+          const timerTd = document.getElementById("timer-" + est.id);
+          if (timerTd) {
+            const now = new Date();
+            const offlineUntil = new Date(est.offlineUntil);
+            const remainingMs = offlineUntil - now;
+            if (remainingMs > 0) {
+              const minutes = Math.floor(remainingMs / 60000);
+              const seconds = Math.floor((remainingMs % 60000) / 1000);
+              timerTd.textContent = `${minutes} min ${seconds} sec`;
+            } else {
+              timerTd.textContent = "Time Expired";
+              // Only mark as expired if not updated by extra time already.
+              db.ref("establishments/" + est.id).update({ expired: true }, error => {
+                if (!error) {
+                  const text = `Offline time expired for venue: ${est.name}.
 (${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
-                      sendWebhook(text);
-                    }
-                  });
+                  sendWebhook(text);
                 }
-              }
+              });
             }
-          });
+          }
         }
       });
     }
@@ -368,7 +369,9 @@ Added By: ${est.addedBy}`;
       ref.once("value", snapshot => {
         const est = snapshot.val();
         if (est) {
+          // Calculate new offlineUntil based on the current offlineUntil value
           const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+          // Update offlineUntil and ensure expired is set to false
           ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
             if (!error) {
               const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
