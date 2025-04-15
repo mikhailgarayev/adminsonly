@@ -466,8 +466,8 @@
               } else {
                 db.ref("establishments/" + est.id).update({ expired: true }, err => {
                   if (!err) {
-                    const text = `📢 Admins only time fully expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-                    const simotext = `📢 Alert: Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
+                    const text = `📢 Admins only time automatically expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
+                    const simotext = `📢 Alert: Admins only time automatically expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public and provide update in the #aze-sales-feedback.`;
                     sendWebhookToBoth(text, simotext);
                   }
                 });
@@ -516,8 +516,8 @@
         if (!err) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `🔕 Admins only status expired for venue: ${est.name}\nReason was: ${est.reason} / By: ${est.addedBy}`;
-            const simotext = ` Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
+            const text = `🔕 Admins only status set manually expired for venue: ${est.name}\nReason was: ${est.reason} / By: ${est.addedBy}`;
+            const simotext = `🔕 Admins only status set manually expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason} / Added By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public and provide update in the #aze-sales-feedback.`;
             sendWebhookToBoth(text, simotext);
           });
         }
