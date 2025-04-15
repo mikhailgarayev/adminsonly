@@ -230,11 +230,9 @@
       establishment.graceExpiresAt = null;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `Added Venue: ${establishment.name}
+          const text = `${establishment.name} was set Admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}`
 URL: ${establishment.url}.
-Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
-Reason: ${establishment.reason}.
-Added By: ${establishment.addedBy}`;
+Reason: ${establishment.reason}.;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
