@@ -453,7 +453,7 @@ Added By: ${est.addedBy}`;
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `Admins only status expired for venue: ${est.name}\mVenue url: (${est.url})\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
+            const text = `Admins only status expired for venue: ${est.name}\nVenue url: (${est.url})\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
             sendWebhook(text);
           });
         }
