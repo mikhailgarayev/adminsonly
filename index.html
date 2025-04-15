@@ -188,7 +188,7 @@
   <div class="card">
     <!-- Form Section -->
     <div class="form-section">
-      <h2>Add Venue</h2>
+      <h2>Set Venue to Admins Only</h2>
       <form id="addEstablishmentForm">
         <label>Your Name:</label>
         <input type="text" id="addedBy" required>
@@ -413,6 +413,7 @@
             const setExpiredBtn = document.createElement("button");
             setExpiredBtn.textContent = "Set Expired";
             setExpiredBtn.style.marginLeft = "5px";
+            setExpiredBtn.style.marginTop = "5px";
             setExpiredBtn.addEventListener("click", function() {
               setExpiredNow(est.id);
             });
