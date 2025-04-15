@@ -2,21 +2,22 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Управление оффлайн-заведениями</title>
-  <!-- Подключаем Firebase SDK (compat-версии для простоты) -->
+  <title>Offline Venues Management</title>
+  <!-- Include Firebase SDK (compat versions for simplicity) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    /* Сброс базовых отступов */
+    /* Reset margins and paddings */
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
-    /* Яркий фон */
+    /* Set background image from background.png in the repository */
     body {
-      background: #00c2ff;
+      background: url("background.png") no-repeat center center fixed;
+      background-size: cover;
       font-family: 'Helvetica Neue', Arial, sans-serif;
       min-height: 100vh;
       display: flex;
@@ -24,16 +25,17 @@
       align-items: center;
     }
 
-    /* Заголовок сайта */
+    /* Site title styling */
     h1.site-title {
       color: #fff;
       font-size: 2rem;
       margin-top: 40px;
       margin-bottom: 20px;
       text-align: center;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
     }
 
-    /* Основная карточка */
+    /* Main card container */
     .card {
       background: #fff;
       border-radius: 10px;
@@ -53,6 +55,7 @@
       margin-bottom: 30px;
     }
 
+    /* Form styling */
     form label {
       display: block;
       margin: 10px 0 0;
@@ -82,6 +85,7 @@
       background-color: #00a9dc;
     }
 
+    /* Table styling */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -110,71 +114,73 @@
   </style>
 </head>
 <body>
-  <h1 class="site-title">Управление оффлайн-заведениями</h1>
+  <h1 class="site-title">Offline Venues Management</h1>
   <div class="card">
+    <!-- Form section to add a venue -->
     <div class="form-section">
-      <h2>Добавить заведение</h2>
+      <h2>Add Venue</h2>
       <form id="addEstablishmentForm">
         <label>
-          Имя заведения:
+          Venue Name:
           <input type="text" id="name" required>
         </label>
         <label>
-          Ссылка:
+          URL:
           <input type="url" id="url" required>
         </label>
         <label>
-          Время оффлайн (в минутах):
+          Offline Time (in minutes):
           <input type="number" id="offlineTime" required>
         </label>
         <label>
-          Причина перевода в оффлайн:
+          Reason for Offline:
           <select id="reason" required>
-            <option value="" disabled selected>Выберите причину</option>
+            <option value="" disabled selected>Select reason</option>
             <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
             <option value="Venue sets itself online">Venue sets itself online</option>
           </select>
         </label>
-        <button type="submit">Добавить заведение</button>
+        <button type="submit">Add Venue</button>
       </form>
     </div>
 
+    <!-- Dashboard section with Active Venues and History -->
     <div class="dashboard">
-      <h2>Активные заведения</h2>
+      <h2>Active Venues</h2>
       <table id="activeTable">
         <thead>
           <tr>
-            <th>Имя заведения</th>
-            <th>Причина</th>
-            <th>Ссылка</th>
-            <th>Оставшееся время</th>
-            <th>Действия</th>
+            <th>Venue Name</th>
+            <th>Reason</th>
+            <th>URL</th>
+            <th>Time Left</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <!-- Активные заведения подставляются динамически -->
+          <!-- Active venues will be injected here dynamically -->
         </tbody>
       </table>
       
-      <h2>История (Истекшие заведения)</h2>
+      <h2>History (Expired Venues)</h2>
       <table id="historyTable">
         <thead>
           <tr>
-            <th>Имя заведения</th>
-            <th>Причина</th>
-            <th>Ссылка</th>
-            <th>Оффлайн до</th>
+            <th>Venue Name</th>
+            <th>Reason</th>
+            <th>URL</th>
+            <th>Offline Until</th>
           </tr>
         </thead>
         <tbody>
-          <!-- История подставляется динамически -->
+          <!-- Expired venues will be injected here dynamically -->
         </tbody>
       </table>
     </div>
   </div>
   
   <script>
-    // ===================== 1. ИНИЦИАЛИЗАЦИЯ FIREBASE =====================
+    // ===================== 1. FIREBASE INITIALIZATION =====================
     const firebaseConfig = {
       apiKey: "AIzaSyBaQYzQmld5VNA_wSI8nDtqENN0TgcNqeA",
       authDomain: "adminsonly.firebaseapp.com",
@@ -188,12 +194,12 @@
     const db = firebase.database();
 
     // ===================== 2. SLACK WEBHOOK =====================
-    // Используем ваш Workflow Web Request URL
+    // Use your Slack Workflow Web Request URL
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    // Функция отправки через Workflow. Передаём только поле text.
+    // This function sends only the field 'text'
     function sendWebhook(text) {
       const payload = {
-        text: text // Только переменная text
+        text: text
       };
 
       fetch(slackWebhookURL, {
@@ -202,28 +208,28 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
-      .then(() => console.log("Workflow webhook отправлен."))
-      .catch(err => console.error("Ошибка вебхука:", err));
+      .then(() => console.log("Workflow webhook sent."))
+      .catch(err => console.error("Webhook error:", err));
     }
 
-    // ===================== 3. ДОБАВЛЕНИЕ ЗАВЕДЕНИЯ =====================
+    // ===================== 3. ADDING A VENUE =====================
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `Добавлено заведение: ${establishment.name}.
-Ссылка: ${establishment.url}.
-Оффлайн до: ${new Date(establishment.offlineUntil).toLocaleString()}.
-Причина: ${establishment.reason}`;
+          const text = `Added Venue: ${establishment.name}.
+URL: ${establishment.url}.
+Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
+Reason: ${establishment.reason}`;
           sendWebhook(text);
         } else {
-          console.error("Ошибка сохранения:", error);
+          console.error("Save error:", error);
         }
       });
     }
 
-    // ===================== 4. ПОДПИСКА НА ИЗМЕНЕНИЯ =====================
+    // ===================== 4. SUBSCRIBE TO DATABASE UPDATES =====================
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -232,7 +238,7 @@
       });
     }
 
-    // ===================== 5. ОТРИСОВКА ДЭШБОАРДА =====================
+    // ===================== 5. RENDER DASHBOARDS =====================
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
@@ -241,7 +247,7 @@
       
       establishments.forEach(est => {
         if (est.expired) {
-          // Запись в историю
+          // Render in History
           const tr = document.createElement("tr");
 
           const tdName = document.createElement("td");
@@ -256,7 +262,7 @@
           const link = document.createElement("a");
           link.href = est.url;
           link.target = "_blank";
-          link.textContent = "Ссылка";
+          link.textContent = "Visit";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
 
@@ -266,7 +272,7 @@
 
           historyTbody.appendChild(tr);
         } else {
-          // Активная запись
+          // Render Active Venue
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
@@ -281,7 +287,7 @@
           const link = document.createElement("a");
           link.href = est.url;
           link.target = "_blank";
-          link.textContent = "Ссылка";
+          link.textContent = "Visit";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
           
@@ -291,7 +297,7 @@
           
           const tdAction = document.createElement("td");
           const addTimeBtn = document.createElement("button");
-          addTimeBtn.textContent = "Добавить время";
+          addTimeBtn.textContent = "Add Extra Time";
           addTimeBtn.addEventListener("click", function() {
             addExtraTime(est.id);
           });
@@ -303,7 +309,7 @@
       });
     }
 
-    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ =====================
+    // ===================== 6. UPDATE TIMERS =====================
     function updateTimers() {
       db.ref("establishments").once("value", snapshot => {
         const data = snapshot.val();
@@ -318,14 +324,14 @@
                 if (remainingMs > 0) {
                   const minutes = Math.floor(remainingMs / 60000);
                   const seconds = Math.floor((remainingMs % 60000) / 1000);
-                  timerTd.textContent = `${minutes} мин ${seconds} сек`;
+                  timerTd.textContent = `${minutes} min ${seconds} sec`;
                 } else {
-                  timerTd.textContent = "Время истекло";
+                  timerTd.textContent = "Time Expired";
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `Оффлайн время истекло для заведения: ${est.name}.
+                      const text = `Offline time expired for venue: ${est.name}.
 (${est.url})
-Причина: ${est.reason}`;
+Reason: ${est.reason}`;
                       sendWebhook(text);
                     }
                   });
@@ -337,9 +343,9 @@
       });
     }
 
-    // ===================== 7. ДОБАВЛЕНИЕ ДОПОЛНИТЕЛЬНОГО ВРЕМЕНИ =====================
+    // ===================== 7. ADD EXTRA TIME =====================
     function addExtraTime(id) {
-      const additionalTime = prompt("Введите дополнительное время в минутах:");
+      const additionalTime = prompt("Enter additional time (in minutes):");
       if (!additionalTime) return;
       const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
       const ref = db.ref("establishments/" + id);
@@ -349,9 +355,9 @@
           const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
           ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
             if (!error) {
-              const text = `Для заведения ${est.name} добавлено дополнительное время (${additionalTime} мин).
-Новый оффлайн до: ${newOfflineUntil.toLocaleString()}.
-Причина: ${est.reason}`;
+              const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
+New offline until: ${newOfflineUntil.toLocaleString()}.
+Reason: ${est.reason}`;
               sendWebhook(text);
             }
           });
@@ -359,13 +365,13 @@
       });
     }
 
-    // ===================== 8. ИНИЦИАЛИЗАЦИЯ =====================
+    // ===================== 8. INITIALIZATION =====================
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // ===================== 9. ОБРАБОТКА ФОРМЫ =====================
+    // ===================== 9. FORM HANDLING =====================
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const name = document.getElementById("name").value;
