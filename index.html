@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Admins Only</title>
+  <title>Управление оффлайн-заведениями</title>
   <!-- Подключаем Firebase SDK (compat-версии для простоты) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -110,45 +110,45 @@
   </style>
 </head>
 <body>
-  <h1 class="site-title">Admins only dashboard</h1>
+  <h1 class="site-title">Управление оффлайн-заведениями</h1>
   <div class="card">
     <div class="form-section">
-      <h2>Add venue</h2>
+      <h2>Добавить заведение</h2>
       <form id="addEstablishmentForm">
         <label>
-          Venue name:
+          Имя заведения:
           <input type="text" id="name" required>
         </label>
         <label>
-          Venue page link:
+          Ссылка:
           <input type="url" id="url" required>
         </label>
         <label>
-          Offline time(in minutes):
+          Время оффлайн (в минутах):
           <input type="number" id="offlineTime" required>
         </label>
         <label>
-          Reason:
+          Причина перевода в оффлайн:
           <select id="reason" required>
-            <option value="" disabled selected>Select a reason</option>
+            <option value="" disabled selected>Выберите причину</option>
             <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
             <option value="Venue sets itself online">Venue sets itself online</option>
           </select>
         </label>
-        <button type="submit">Add venue</button>
+        <button type="submit">Добавить заведение</button>
       </form>
     </div>
 
     <div class="dashboard">
-      <h2>Active venues</h2>
+      <h2>Активные заведения</h2>
       <table id="activeTable">
         <thead>
           <tr>
-            <th>Venue name</th>
-            <th>Reason</th>
-            <th>Link</th>
-            <th>Time left</th>
-            <th>Actions</th>
+            <th>Имя заведения</th>
+            <th>Причина</th>
+            <th>Ссылка</th>
+            <th>Оставшееся время</th>
+            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -160,10 +160,10 @@
       <table id="historyTable">
         <thead>
           <tr>
-            <th>Venue name</th>
-            <th>Reason</th>
-            <th>Link</th>
-            <th>Offline till</th>
+            <th>Имя заведения</th>
+            <th>Причина</th>
+            <th>Ссылка</th>
+            <th>Оффлайн до</th>
           </tr>
         </thead>
         <tbody>
@@ -188,18 +188,12 @@
     const db = firebase.database();
 
     // ===================== 2. SLACK WEBHOOK =====================
+    // Используем ваш Workflow Web Request URL
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
+    // Функция отправки через Workflow. Передаём только поле text.
     function sendWebhook(text) {
       const payload = {
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: text
-            }
-          }
-        ]
+        text: text // Только переменная text
       };
 
       fetch(slackWebhookURL, {
@@ -247,6 +241,7 @@
       
       establishments.forEach(est => {
         if (est.expired) {
+          // Запись в историю
           const tr = document.createElement("tr");
 
           const tdName = document.createElement("td");
@@ -271,6 +266,7 @@
 
           historyTbody.appendChild(tr);
         } else {
+          // Активная запись
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
