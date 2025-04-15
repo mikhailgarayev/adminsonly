@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Управление оффлайн-заведениями</title>
+  <title>Admins Only</title>
   <!-- Подключаем Firebase SDK (compat-версии для простоты) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -14,12 +14,12 @@
       padding: 0;
     }
 
-    /* Яркий фон в стиле Wolt */
+    /* Яркий фон */
     body {
-      background: #00c2ff; /* Цвет фона, напоминающий фирменный цвет Wolt */
+      background: #00c2ff;
       font-family: 'Helvetica Neue', Arial, sans-serif;
       min-height: 100vh;
-      display: flex;          /* Разместим содержимое по центру */
+      display: flex;
       flex-direction: column;
       align-items: center;
     }
@@ -33,7 +33,7 @@
       text-align: center;
     }
 
-    /* Основная «карточка», где размещается форма и таблицы */
+    /* Основная карточка */
     .card {
       background: #fff;
       border-radius: 10px;
@@ -44,18 +44,15 @@
       margin-bottom: 40px;
     }
 
-    /* Заголовки внутри карточки */
     h2 {
       margin-bottom: 10px;
       color: #333;
     }
 
-    /* Секции формы и дэшбоарда */
     .form-section, .dashboard {
       margin-bottom: 30px;
     }
 
-    /* Стили формы */
     form label {
       display: block;
       margin: 10px 0 0;
@@ -85,11 +82,11 @@
       background-color: #00a9dc;
     }
 
-    /* Таблицы */
     table {
       width: 100%;
       border-collapse: collapse;
       background: #fff;
+      margin-bottom: 20px;
     }
 
     th, td {
@@ -103,7 +100,6 @@
       color: #333;
     }
 
-    /* Пример стилей для ссылок */
     a {
       color: #00c2ff;
       text-decoration: none;
@@ -111,57 +107,48 @@
     a:hover {
       text-decoration: underline;
     }
-
-    /* Дополнительные отступы */
-    .dashboard h2 {
-      margin-top: 0;
-    }
   </style>
 </head>
 <body>
-  <h1 class="site-title">Управление оффлайн-заведениями</h1>
-
-  <!-- Основная «карточка» (контейнер) -->
+  <h1 class="site-title">Admins only dashboard</h1>
   <div class="card">
-    <!-- Форма для добавления заведения -->
     <div class="form-section">
-      <h2>Добавить заведение</h2>
+      <h2>Add venue</h2>
       <form id="addEstablishmentForm">
         <label>
-          Имя заведения:
+          Venue name:
           <input type="text" id="name" required>
         </label>
         <label>
-          Ссылка:
+          Venue page link:
           <input type="url" id="url" required>
         </label>
         <label>
-          Время оффлайн (в минутах):
+          Offline time(in minutes):
           <input type="number" id="offlineTime" required>
         </label>
         <label>
-          Причина перевода в оффлайн:
+          Reason:
           <select id="reason" required>
-            <option value="" disabled selected>Выберите причину</option>
+            <option value="" disabled selected>Select a reason</option>
             <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
             <option value="Venue sets itself online">Venue sets itself online</option>
           </select>
         </label>
-        <button type="submit">Добавить заведение</button>
+        <button type="submit">Add venue</button>
       </form>
     </div>
 
-    <!-- Дэшбоард с двумя разделами: Активные и История -->
     <div class="dashboard">
-      <h2>Активные заведения</h2>
+      <h2>Active venues</h2>
       <table id="activeTable">
         <thead>
           <tr>
-            <th>Имя заведения</th>
-            <th>Причина</th>
-            <th>Ссылка</th>
-            <th>Оставшееся время</th>
-            <th>Действия</th>
+            <th>Venue name</th>
+            <th>Reason</th>
+            <th>Link</th>
+            <th>Time left</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -173,10 +160,10 @@
       <table id="historyTable">
         <thead>
           <tr>
-            <th>Имя заведения</th>
-            <th>Причина</th>
-            <th>Ссылка</th>
-            <th>Оффлайн до</th>
+            <th>Venue name</th>
+            <th>Reason</th>
+            <th>Link</th>
+            <th>Offline till</th>
           </tr>
         </thead>
         <tbody>
@@ -203,13 +190,25 @@
     // ===================== 2. SLACK WEBHOOK =====================
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
     function sendWebhook(text) {
+      const payload = {
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: text
+            }
+          }
+        ]
+      };
+
       fetch(slackWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text })
+        body: JSON.stringify(payload)
       })
-      .then(() => console.log("Вебхук отправлен."))
+      .then(() => console.log("Workflow webhook отправлен."))
       .catch(err => console.error("Ошибка вебхука:", err));
     }
 
@@ -248,7 +247,6 @@
       
       establishments.forEach(est => {
         if (est.expired) {
-          // Запись в историю
           const tr = document.createElement("tr");
 
           const tdName = document.createElement("td");
@@ -273,7 +271,6 @@
 
           historyTbody.appendChild(tr);
         } else {
-          // Активная запись
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
@@ -354,7 +351,6 @@
         const est = snapshot.val();
         if (est) {
           const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-          // Обновляем время и снимаем флаг expired, чтобы заведение вернулось в активные
           ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
             if (!error) {
               const text = `Для заведения ${est.name} добавлено дополнительное время (${additionalTime} мин).
@@ -379,7 +375,7 @@
       const name = document.getElementById("name").value;
       const url = document.getElementById("url").value;
       const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
-      const reason = document.getElementById("reason").value;  
+      const reason = document.getElementById("reason").value;
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
       
