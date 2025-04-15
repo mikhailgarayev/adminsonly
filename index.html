@@ -243,7 +243,7 @@
       establishment.graceExpiresAt = null;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `Venue Added: ${establishment.name}\nURL: ${establishment.url}\nOffline Until: ${new Date(establishment.offlineUntil).toLocaleString()}\nReason: ${establishment.reason}\nAdded By: ${establishment.addedBy}`;
+          const text = `The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nURL: ${establishment.url}\nReason: ${establishment.reason}`;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
