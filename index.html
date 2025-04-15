@@ -4,69 +4,108 @@
   <meta charset="UTF-8">
   <title>Управление оффлайн-заведениями</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
     }
-    .form-section, .dashboard {
-      margin-bottom: 30px;
+    .form-section, .dashboard { 
+      margin-bottom: 30px; 
     }
-    .dashboard table {
-      width: 100%;
-      border-collapse: collapse;
+    .dashboard table { 
+      width: 100%; 
+      border-collapse: collapse; 
     }
-    .dashboard th, .dashboard td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
+    .dashboard th, .dashboard td { 
+      border: 1px solid #ccc; 
+      padding: 10px; 
+      text-align: center; 
     }
-    .dashboard th {
-      background-color: #f2f2f2;
+    .dashboard th { 
+      background-color: #f2f2f2; 
     }
-    button {
-      cursor: pointer;
+    button { 
+      cursor: pointer; 
     }
   </style>
   
-  <!-- Подключаем Firebase (версия compat для упрощённого синтаксиса) -->
+  <!-- Подключаем Firebase SDK (compat-версии для простоты) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>Управление оффлайн-заведениями</h1>
+  
+  <!-- Форма для добавления заведения -->
+  <div class="form-section">
+    <h2>Добавить заведение</h2>
+    <form id="addEstablishmentForm">
+      <label>
+        Имя заведения: <input type="text" id="name" required>
+      </label><br><br>
+      <label>
+        Ссылка: <input type="url" id="url" required>
+      </label><br><br>
+      <label>
+        Время оффлайн (в минутах): <input type="number" id="offlineTime" required>
+      </label><br><br>
+      <button type="submit">Добавить заведение</button>
+    </form>
+  </div>
+  
+  <!-- Дэшбоард для отображения заведений -->
+  <div class="dashboard">
+    <h2>Заведения в оффлайн-режиме</h2>
+    <table id="dashboardTable">
+      <thead>
+        <tr>
+          <th>Имя заведения</th>
+          <th>Ссылка</th>
+          <th>Оставшееся время</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Данные будут подставляться динамически -->
+      </tbody>
+    </table>
+  </div>
   
   <script>
-    // ======== ЗАМЕНИТЕ НИЖЕ СВОИМИ ДАННЫМИ ИЗ Firebase Console ========
+    // ===================== 1. ИНИЦИАЛИЗАЦИЯ FIREBASE =====================
+    // Ваши данные из Firebase Console:
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyBaQYzQmld5VNA_wSI8nDtqENN0TgcNqeA",
+      authDomain: "adminsonly.firebaseapp.com",
+      databaseURL: "https://adminsonly-default-rtdb.firebaseio.com",
+      projectId: "adminsonly",
+      storageBucket: "adminsonly.firebasestorage.app",
+      messagingSenderId: "194528429901",
+      appId: "1:194528429901:web:805ca2f1dd0feca2de1904"
     };
-    // Инициализируем Firebase
+
+    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    
+
+    // ===================== 2. SLACK WEBHOOK =====================
     // URL вашего Slack вебхука
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    
-    // Функция отправки POST-запроса на вебхук
+
+    // Функция отправки уведомлений через Slack вебхук
     function sendWebhook(text) {
       fetch(slackWebhookURL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text })
       })
       .then(response => response.text())
-      .then(data => console.log("Ответ вебхука:", data))
+      .then(data => console.log("Вебхук ответ:", data))
       .catch(err => console.error("Ошибка вебхука:", err));
     }
-    
-    // Добавление нового заведения в базу
+
+    // ===================== 3. ФУНКЦИЯ ДОБАВЛЕНИЯ ЗАВЕДЕНИЯ =====================
     function addEstablishment(establishment) {
-      // Push создаст новый уникальный ключ для записи
+      // Создаём новую запись с уникальным ключом
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
       newRef.set(establishment, error => {
@@ -78,8 +117,8 @@
         }
       });
     }
-    
-    // Слушаем изменения в базе для обновления дэшбоарда
+
+    // ===================== 4. ПОДПИСКА НА ИЗМЕНЕНИЯ ДАННЫХ (ДЭШБОАРД) =====================
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -87,14 +126,13 @@
         renderDashboard(establishments);
       });
     }
-    
-    // Отрисовка дэшбоарда
+
+    // ===================== 5. ФУНКЦИЯ ОТРИСОВКИ ДЭШБОАРДА =====================
     function renderDashboard(establishments) {
       const tbody = document.getElementById("dashboardTable").querySelector("tbody");
       tbody.innerHTML = "";
       
       establishments.forEach(est => {
-        // Создаем строку таблицы для каждого заведения
         const tr = document.createElement("tr");
         
         // Имя заведения
@@ -129,9 +167,10 @@
         tbody.appendChild(tr);
       });
     }
-    
-    // Обновление таймеров – каждую секунду
+
+    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ =====================
     function updateTimers() {
+      // Получаем данные для обновления таймеров
       db.ref("establishments").once("value", snapshot => {
         const data = snapshot.val();
         if (data) {
@@ -148,7 +187,7 @@
               } else {
                 timerTd.textContent = "Время истекло";
                 if (!est.expired) {
-                  // Обновляем запись: устанавливаем expired в true
+                  // Если время истекло – обновляем запись для отметки истечения
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
                       const text = `Оффлайн время истекло для заведения: ${est.name}.\n(${est.url})`;
@@ -162,13 +201,12 @@
         }
       });
     }
-    
-    // Функция для добавления дополнительного времени вручную
+
+    // ===================== 7. ДОБАВЛЕНИЕ ДОПОЛНИТЕЛЬНОГО ВРЕМЕНИ =====================
     function addExtraTime(id) {
       const additionalTime = prompt("Введите дополнительное время в минутах:");
       if (!additionalTime) return;
       const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
-      // Сначала получаем текущие данные заведения, затем обновляем offlineUntil
       const ref = db.ref("establishments/" + id);
       ref.once("value", snapshot => {
         const est = snapshot.val();
@@ -183,76 +221,34 @@
         }
       });
     }
-    
-    // Запускаем обновление таймеров каждую секунду
-    setInterval(updateTimers, 1000);
-    
-    // Подписываемся на обновления дэшбоарда при загрузке страницы
-    window.addEventListener("load", subscribeToDashboard);
-    
-    // Обработчик формы добавления нового заведения
-    window.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
-        e.preventDefault();
-        const name = document.getElementById("name").value;
-        const url = document.getElementById("url").value;
-        const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
-        const now = new Date();
-        const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
-        
-        const establishment = {
-          name: name,
-          url: url,
-          offlineUntil: offlineUntil.toISOString(),
-          addedOfflineTime: offlineTimeMinutes,
-          expired: false
-        };
-        
-        // Сохраняем заведение в Firebase
-        addEstablishment(establishment);
-        
-        // Сброс формы
-        e.target.reset();
-      });
+
+    // ===================== 8. ИНИЦИАЛИЗАЦИЯ =====================
+    window.addEventListener("load", () => {
+      subscribeToDashboard();
+      // Обновляем таймеры каждую секунду
+      setInterval(updateTimers, 1000);
+    });
+
+    // ===================== 9. ОБРАБОТКА ФОРМЫ =====================
+    document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const name = document.getElementById("name").value;
+      const url = document.getElementById("url").value;
+      const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
+      const now = new Date();
+      const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
+      
+      const establishment = {
+        name: name,
+        url: url,
+        offlineUntil: offlineUntil.toISOString(),
+        addedOfflineTime: offlineTimeMinutes,
+        expired: false
+      };
+      
+      addEstablishment(establishment);
+      e.target.reset();
     });
   </script>
-</head>
-<body>
-  <h1>Управление оффлайн-заведениями</h1>
-  
-  <!-- Форма для добавления заведения -->
-  <div class="form-section">
-    <h2>Добавить заведение</h2>
-    <form id="addEstablishmentForm">
-      <label>
-        Имя заведения: <input type="text" id="name" required>
-      </label><br><br>
-      <label>
-        Ссылка: <input type="url" id="url" required>
-      </label><br><br>
-      <label>
-        Время оффлайн (в минутах): <input type="number" id="offlineTime" required>
-      </label><br><br>
-      <button type="submit">Добавить заведение</button>
-    </form>
-  </div>
-  
-  <!-- Дэшбоард заведений -->
-  <div class="dashboard">
-    <h2>Заведения в оффлайн-режиме</h2>
-    <table id="dashboardTable">
-      <thead>
-        <tr>
-          <th>Имя заведения</th>
-          <th>Ссылка</th>
-          <th>Оставшееся время</th>
-          <th>Действия</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Данные подставляются динамически из Firebase -->
-      </tbody>
-    </table>
-  </div>
 </body>
 </html>
