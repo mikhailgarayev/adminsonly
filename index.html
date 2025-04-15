@@ -242,7 +242,7 @@ Added By: ${establishment.addedBy}`;
       });
     }
 
-    // Глобальная переменная для текущих данных
+    // Global variable for current data
     let currentEstablishments = [];
 
     // ===================== 4. SUBSCRIBE TO DATABASE UPDATES =====================
@@ -321,7 +321,7 @@ Added By: ${establishment.addedBy}`;
           tr.appendChild(tdTimer);
           
           const tdAction = document.createElement("td");
-          // Кнопка Add Extra Time
+          // Button for adding extra time
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
           addTimeBtn.addEventListener("click", function() {
@@ -329,7 +329,7 @@ Added By: ${establishment.addedBy}`;
           });
           tdAction.appendChild(addTimeBtn);
           
-          // Если заведение уже в grace-периоде, добавляем кнопку "Set Expired"
+          // If venue is in grace period, add "Set Expired" button
           if (est.graceExpiresAt) {
             const setExpiredBtn = document.createElement("button");
             setExpiredBtn.textContent = "Set Expired";
@@ -363,19 +363,19 @@ Added By: ${establishment.addedBy}`;
             } else {
               // Time has expired—check for grace period
               if (!est.graceExpiresAt) {
-                // Start grace period: 5 minutes from now
-                const graceExpires = new Date(now + 5 * 60 * 1000).toISOString();
+                // Start grace period: 10 minutes from now
+                const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
                 db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
                 // Send notification about grace period start
-                const text = `Admins only time expired for venue: ${est.name}.
-You can add extra time within the next 5 minutes or click "Set Expired" to mark it as expired.
+                const text = `Offline time expired for venue: ${est.name}.
+You can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.
 (${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
                 sendWebhook(text);
-                // Also update local object (if possible)
+                // Update local object
                 est.graceExpiresAt = graceExpires;
-                timerTd.textContent = "Grace: 5 min 0 sec";
+                timerTd.textContent = "Grace: 10 min 0 sec";
               } else {
                 // Grace period is active
                 const graceExpiresTime = new Date(est.graceExpiresAt).getTime();
@@ -385,10 +385,10 @@ Added By: ${est.addedBy}`;
                   const seconds = Math.floor((graceRemaining % 60000) / 1000);
                   timerTd.textContent = `Grace: ${minutes} min ${seconds} sec`;
                 } else {
-                  // Grace period is over—mark as expired if not already done
+                  // Grace period is over—mark as expired
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `Admins only time fully expired for venue: ${est.name} Please, do not forget to set venue back to public.
+                      const text = `Offline time fully expired for venue: ${est.name}.
 (${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
@@ -412,9 +412,9 @@ Added By: ${est.addedBy}`;
         const est = snapshot.val();
         if (!est) return;
         const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
-        // Calculate new offlineUntil based on the current offlineUntil
+        // Calculate new offlineUntil based on current offlineUntil
         const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-        // Update the record: new offlineUntil and clear graceExpiresAt (set to null)
+        // Update: new offlineUntil and clear graceExpiresAt (set to null)
         ref.update({
           offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
@@ -426,7 +426,7 @@ New offline until: ${newOfflineUntil.toLocaleString()}.
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
             sendWebhook(text);
-            // Force re-read of the data to update currentEstablishments and UI
+            // Force re-read to update local data and UI
             db.ref("establishments").once("value", snap => {
               const data = snap.val();
               currentEstablishments = data ? Object.values(data) : [];
@@ -444,7 +444,7 @@ Added By: ${est.addedBy}`;
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `${est.name} venue admins only was set expired.
+            const text = `Venue set to expired: ${est.name}.
 (${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
