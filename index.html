@@ -230,7 +230,7 @@
       establishment.graceExpiresAt = null;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `Added Venue: ${establishment.name}.
+          const text = `Added Venue: ${establishment.name}
 URL: ${establishment.url}.
 Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
 Reason: ${establishment.reason}.
@@ -283,7 +283,7 @@ Added By: ${establishment.addedBy}`;
           const link = document.createElement("a");
           link.href = est.url;
           link.target = "_blank";
-          link.textContent = "Visit";
+          link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
           
@@ -312,7 +312,7 @@ Added By: ${establishment.addedBy}`;
           const link = document.createElement("a");
           link.href = est.url;
           link.target = "_blank";
-          link.textContent = "Visit";
+          link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
           
@@ -369,7 +369,7 @@ Added By: ${establishment.addedBy}`;
                 // Send notification about grace period start
                 const text = `Offline time expired for venue: ${est.name}.
 You can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.
-(${est.url})
+(${est.url} )
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
                 sendWebhook(text);
