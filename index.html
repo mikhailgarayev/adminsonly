@@ -27,6 +27,10 @@
     button { 
       cursor: pointer; 
     }
+    select, input { 
+      padding: 5px; 
+      margin: 5px 0;
+    }
   </style>
   
   <!-- Подключаем Firebase SDK (compat-версии для простоты) -->
@@ -49,6 +53,14 @@
       <label>
         Время оффлайн (в минутах): <input type="number" id="offlineTime" required>
       </label><br><br>
+      <label>
+        Причина перевода в оффлайн:<br>
+        <select id="reason" required>
+          <option value="" disabled selected>Выберите причину</option>
+          <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
+          <option value="Venue sets itself online">Venue sets itself online</option>
+        </select>
+      </label><br><br>
       <button type="submit">Добавить заведение</button>
     </form>
   </div>
@@ -60,6 +72,7 @@
       <thead>
         <tr>
           <th>Имя заведения</th>
+          <th>Причина</th>
           <th>Ссылка</th>
           <th>Оставшееся время</th>
           <th>Действия</th>
@@ -75,6 +88,7 @@
       <thead>
         <tr>
           <th>Имя заведения</th>
+          <th>Причина</th>
           <th>Ссылка</th>
           <th>Оффлайн до</th>
         </tr>
@@ -106,7 +120,7 @@
     function sendWebhook(text) {
       fetch(slackWebhookURL, {
         method: "POST",
-        mode: "no-cors", // Используем no-cors для обхода ограничений браузера
+        mode: "no-cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text })
       })
@@ -122,7 +136,8 @@
         if (!error) {
           const text = `Добавлено заведение: ${establishment.name}.
 Ссылка: ${establishment.url}.
-Оффлайн до: ${new Date(establishment.offlineUntil).toLocaleString()}.`;
+Оффлайн до: ${new Date(establishment.offlineUntil).toLocaleString()}.
+Причина: ${establishment.reason}`;
           sendWebhook(text);
         } else {
           console.error("Ошибка сохранения:", error);
@@ -140,7 +155,6 @@
     }
 
     // ===================== 5. ОТРИСОВКА ДЭШБОАРДА =====================
-    // Разделяем заведения на активные и историю
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
@@ -148,12 +162,17 @@
       historyTbody.innerHTML = "";
       
       establishments.forEach(est => {
-        // Если заведение истекло (expired == true) – покажем его в истории
         if (est.expired) {
+          // Рисуем строку для истории
           const tr = document.createElement("tr");
+
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
+
+          const tdReason = document.createElement("td");
+          tdReason.textContent = est.reason || "";
+          tr.appendChild(tdReason);
 
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
@@ -164,18 +183,22 @@
           tr.appendChild(tdUrl);
 
           const tdOfflineUntil = document.createElement("td");
-          // Показываем дату окончания оффлайн-режима
           tdOfflineUntil.textContent = new Date(est.offlineUntil).toLocaleString();
           tr.appendChild(tdOfflineUntil);
 
           historyTbody.appendChild(tr);
-        } else {  // Если заведение активно
+        } else {
+          // Рисуем строку для активных заведений
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
-          
+
+          const tdReason = document.createElement("td");
+          tdReason.textContent = est.reason || "";
+          tr.appendChild(tdReason);
+
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -202,13 +225,13 @@
       });
     }
 
-    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ (только для активных) =====================
+    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ =====================
     function updateTimers() {
       db.ref("establishments").once("value", snapshot => {
         const data = snapshot.val();
         if (data) {
           Object.values(data).forEach(est => {
-            if (!est.expired) { // Обновляем таймер для активного заведения
+            if (!est.expired) {
               const timerTd = document.getElementById("timer-" + est.id);
               if (timerTd) {
                 const now = new Date();
@@ -220,11 +243,12 @@
                   timerTd.textContent = `${minutes} мин ${seconds} сек`;
                 } else {
                   timerTd.textContent = "Время истекло";
-                  // Если время истекло – обновляем запись и переводим в историю
+                  // Если время истекло – переводим заведение в историю (устанавливаем expired)
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
                       const text = `Оффлайн время истекло для заведения: ${est.name}.
-(${est.url})`;
+(${est.url})
+Причина: ${est.reason}`;
                       sendWebhook(text);
                     }
                   });
@@ -250,7 +274,8 @@
           ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
             if (!error) {
               const text = `Для заведения ${est.name} добавлено дополнительное время (${additionalTime} мин).
-Новый оффлайн до: ${newOfflineUntil.toLocaleString()}.`;
+Новый оффлайн до: ${newOfflineUntil.toLocaleString()}.
+Причина: ${est.reason}`;
               sendWebhook(text);
             }
           });
@@ -270,6 +295,7 @@
       const name = document.getElementById("name").value;
       const url = document.getElementById("url").value;
       const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
+      const reason = document.getElementById("reason").value;  // Получаем выбранную причину
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
       
@@ -278,6 +304,7 @@
         url: url,
         offlineUntil: offlineUntil.toISOString(),
         addedOfflineTime: offlineTimeMinutes,
+        reason: reason,
         expired: false
       };
       
