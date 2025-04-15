@@ -14,7 +14,7 @@
       padding: 0;
     }
 
-    /* Set background image from background.png in the repository */
+    /* Set background image from background.png located in the repository */
     body {
       background: url("background.png") no-repeat center center fixed;
       background-size: cover;
@@ -121,6 +121,10 @@
       <h2>Add Venue</h2>
       <form id="addEstablishmentForm">
         <label>
+          Your Name:
+          <input type="text" id="addedBy" required>
+        </label>
+        <label>
           Venue Name:
           <input type="text" id="name" required>
         </label>
@@ -151,6 +155,7 @@
         <thead>
           <tr>
             <th>Venue Name</th>
+            <th>Added By</th>
             <th>Reason</th>
             <th>URL</th>
             <th>Time Left</th>
@@ -158,7 +163,7 @@
           </tr>
         </thead>
         <tbody>
-          <!-- Active venues will be injected here dynamically -->
+          <!-- Active venues will be injected dynamically -->
         </tbody>
       </table>
       
@@ -167,13 +172,14 @@
         <thead>
           <tr>
             <th>Venue Name</th>
+            <th>Added By</th>
             <th>Reason</th>
             <th>URL</th>
             <th>Offline Until</th>
           </tr>
         </thead>
         <tbody>
-          <!-- Expired venues will be injected here dynamically -->
+          <!-- Expired venues will be injected dynamically -->
         </tbody>
       </table>
     </div>
@@ -196,7 +202,7 @@
     // ===================== 2. SLACK WEBHOOK =====================
     // Use your Slack Workflow Web Request URL
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    // This function sends only the field 'text'
+    // Function to send notifications using only the text field
     function sendWebhook(text) {
       const payload = {
         text: text
@@ -212,7 +218,7 @@
       .catch(err => console.error("Webhook error:", err));
     }
 
-    // ===================== 3. ADDING A VENUE =====================
+    // ===================== 3. ADD VENUE FUNCTION =====================
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
@@ -221,7 +227,8 @@
           const text = `Added Venue: ${establishment.name}.
 URL: ${establishment.url}.
 Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
-Reason: ${establishment.reason}`;
+Reason: ${establishment.reason}.
+Added By: ${establishment.addedBy}`;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
@@ -247,12 +254,16 @@ Reason: ${establishment.reason}`;
       
       establishments.forEach(est => {
         if (est.expired) {
-          // Render in History
+          // Render expired venue in History
           const tr = document.createElement("tr");
 
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
+
+          const tdAddedBy = document.createElement("td");
+          tdAddedBy.textContent = est.addedBy || "";
+          tr.appendChild(tdAddedBy);
 
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
@@ -272,12 +283,16 @@ Reason: ${establishment.reason}`;
 
           historyTbody.appendChild(tr);
         } else {
-          // Render Active Venue
+          // Render active venue
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
+          
+          const tdAddedBy = document.createElement("td");
+          tdAddedBy.textContent = est.addedBy || "";
+          tr.appendChild(tdAddedBy);
 
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
@@ -331,7 +346,8 @@ Reason: ${establishment.reason}`;
                     if (!error) {
                       const text = `Offline time expired for venue: ${est.name}.
 (${est.url})
-Reason: ${est.reason}`;
+Reason: ${est.reason}.
+Added By: ${est.addedBy}`;
                       sendWebhook(text);
                     }
                   });
@@ -357,7 +373,8 @@ Reason: ${est.reason}`;
             if (!error) {
               const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
 New offline until: ${newOfflineUntil.toLocaleString()}.
-Reason: ${est.reason}`;
+Reason: ${est.reason}.
+Added By: ${est.addedBy}`;
               sendWebhook(text);
             }
           });
@@ -374,6 +391,7 @@ Reason: ${est.reason}`;
     // ===================== 9. FORM HANDLING =====================
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
+      const addedBy = document.getElementById("addedBy").value;
       const name = document.getElementById("name").value;
       const url = document.getElementById("url").value;
       const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
@@ -382,6 +400,7 @@ Reason: ${est.reason}`;
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
       
       const establishment = {
+        addedBy: addedBy,
         name: name,
         url: url,
         offlineUntil: offlineUntil.toISOString(),
