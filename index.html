@@ -11,16 +11,17 @@
     .form-section, .dashboard { 
       margin-bottom: 30px; 
     }
-    .dashboard table { 
+    table { 
       width: 100%; 
       border-collapse: collapse; 
+      margin-bottom: 20px;
     }
-    .dashboard th, .dashboard td { 
+    th, td { 
       border: 1px solid #ccc; 
       padding: 10px; 
       text-align: center; 
     }
-    .dashboard th { 
+    th { 
       background-color: #f2f2f2; 
     }
     button { 
@@ -52,10 +53,10 @@
     </form>
   </div>
   
-  <!-- Дэшбоард для отображения заведений -->
+  <!-- Дэшбоард с двумя разделами: Активные и История -->
   <div class="dashboard">
-    <h2>Заведения в оффлайн-режиме</h2>
-    <table id="dashboardTable">
+    <h2>Активные заведения</h2>
+    <table id="activeTable">
       <thead>
         <tr>
           <th>Имя заведения</th>
@@ -65,7 +66,21 @@
         </tr>
       </thead>
       <tbody>
-        <!-- Данные будут подставляться динамически -->
+        <!-- Активные заведения подставляются динамически -->
+      </tbody>
+    </table>
+    
+    <h2>История (Истекшие заведения)</h2>
+    <table id="historyTable">
+      <thead>
+        <tr>
+          <th>Имя заведения</th>
+          <th>Ссылка</th>
+          <th>Оффлайн до</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- История подставляется динамически -->
       </tbody>
     </table>
   </div>
@@ -83,20 +98,15 @@
       appId: "1:194528429901:web:805ca2f1dd0feca2de1904"
     };
 
-    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     // ===================== 2. SLACK WEBHOOK =====================
-    // URL вашего Slack вебхука (убедитесь, что он корректный)
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-
-    // Функция отправки уведомлений через Slack вебхук.
-    // Используем "no-cors" для обхода CORS-блокировки.
     function sendWebhook(text) {
       fetch(slackWebhookURL, {
         method: "POST",
-        mode: "no-cors",  // Важно: использование no-cors, чтобы избежать блокировки браузером
+        mode: "no-cors", // Используем no-cors для обхода ограничений браузера
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text })
       })
@@ -104,14 +114,15 @@
       .catch(err => console.error("Ошибка вебхука:", err));
     }
 
-    // ===================== 3. ФУНКЦИЯ ДОБАВЛЕНИЯ ЗАВЕДЕНИЯ =====================
+    // ===================== 3. ДОБАВЛЕНИЕ ЗАВЕДЕНИЯ =====================
     function addEstablishment(establishment) {
-      // Создаём новую запись с уникальным ключом
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `Добавлено заведение: ${establishment.name}.\nСсылка: ${establishment.url}.\nОффлайн до: ${new Date(establishment.offlineUntil).toLocaleString()}.`;
+          const text = `Добавлено заведение: ${establishment.name}.
+Ссылка: ${establishment.url}.
+Оффлайн до: ${new Date(establishment.offlineUntil).toLocaleString()}.`;
           sendWebhook(text);
         } else {
           console.error("Ошибка сохранения:", error);
@@ -119,78 +130,101 @@
       });
     }
 
-    // ===================== 4. ПОДПИСКА НА ИЗМЕНЕНИЯ ДАННЫХ (ДЭШБОАРД) =====================
+    // ===================== 4. ПОДПИСКА НА ИЗМЕНЕНИЯ (ОБЩАЯ ФУНКЦИЯ) =====================
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
-        const establishments = data ? Object.values(data) : [];
-        renderDashboard(establishments);
+        const allEstablishments = data ? Object.values(data) : [];
+        renderDashboards(allEstablishments);
       });
     }
 
-    // ===================== 5. ФУНКЦИЯ ОТРИСОВКИ ДЭШБОАРДА =====================
-    function renderDashboard(establishments) {
-      const tbody = document.getElementById("dashboardTable").querySelector("tbody");
-      tbody.innerHTML = "";
+    // ===================== 5. ОТРИСОВКА ДЭШБОАРДА =====================
+    // Разделяем заведения на активные и историю
+    function renderDashboards(establishments) {
+      const activeTbody = document.getElementById("activeTable").querySelector("tbody");
+      const historyTbody = document.getElementById("historyTable").querySelector("tbody");
+      activeTbody.innerHTML = "";
+      historyTbody.innerHTML = "";
       
       establishments.forEach(est => {
-        const tr = document.createElement("tr");
-        
-        // Имя заведения
-        const tdName = document.createElement("td");
-        tdName.textContent = est.name;
-        tr.appendChild(tdName);
-        
-        // Ссылка
-        const tdUrl = document.createElement("td");
-        const link = document.createElement("a");
-        link.href = est.url;
-        link.target = "_blank";
-        link.textContent = "Ссылка";
-        tdUrl.appendChild(link);
-        tr.appendChild(tdUrl);
-        
-        // Таймер оставшегося времени
-        const tdTimer = document.createElement("td");
-        tdTimer.id = "timer-" + est.id;
-        tr.appendChild(tdTimer);
-        
-        // Действия: кнопка "Добавить время"
-        const tdAction = document.createElement("td");
-        const addTimeBtn = document.createElement("button");
-        addTimeBtn.textContent = "Добавить время";
-        addTimeBtn.addEventListener("click", function() {
-          addExtraTime(est.id);
-        });
-        tdAction.appendChild(addTimeBtn);
-        tr.appendChild(tdAction);
-        
-        tbody.appendChild(tr);
+        // Если заведение истекло (expired == true) – покажем его в истории
+        if (est.expired) {
+          const tr = document.createElement("tr");
+          const tdName = document.createElement("td");
+          tdName.textContent = est.name;
+          tr.appendChild(tdName);
+
+          const tdUrl = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = est.url;
+          link.target = "_blank";
+          link.textContent = "Ссылка";
+          tdUrl.appendChild(link);
+          tr.appendChild(tdUrl);
+
+          const tdOfflineUntil = document.createElement("td");
+          // Показываем дату окончания оффлайн-режима
+          tdOfflineUntil.textContent = new Date(est.offlineUntil).toLocaleString();
+          tr.appendChild(tdOfflineUntil);
+
+          historyTbody.appendChild(tr);
+        } else {  // Если заведение активно
+          const tr = document.createElement("tr");
+          
+          const tdName = document.createElement("td");
+          tdName.textContent = est.name;
+          tr.appendChild(tdName);
+          
+          const tdUrl = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = est.url;
+          link.target = "_blank";
+          link.textContent = "Ссылка";
+          tdUrl.appendChild(link);
+          tr.appendChild(tdUrl);
+          
+          const tdTimer = document.createElement("td");
+          tdTimer.id = "timer-" + est.id;
+          tr.appendChild(tdTimer);
+          
+          const tdAction = document.createElement("td");
+          const addTimeBtn = document.createElement("button");
+          addTimeBtn.textContent = "Добавить время";
+          addTimeBtn.addEventListener("click", function() {
+            addExtraTime(est.id);
+          });
+          tdAction.appendChild(addTimeBtn);
+          tr.appendChild(tdAction);
+          
+          activeTbody.appendChild(tr);
+        }
       });
     }
 
-    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ =====================
+    // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ (только для активных) =====================
     function updateTimers() {
       db.ref("establishments").once("value", snapshot => {
         const data = snapshot.val();
         if (data) {
           Object.values(data).forEach(est => {
-            const timerTd = document.getElementById("timer-" + est.id);
-            if (timerTd) {
-              const now = new Date();
-              const offlineUntil = new Date(est.offlineUntil);
-              const remainingMs = offlineUntil - now;
-              if (remainingMs > 0) {
-                const minutes = Math.floor(remainingMs / 60000);
-                const seconds = Math.floor((remainingMs % 60000) / 1000);
-                timerTd.textContent = `${minutes} мин ${seconds} сек`;
-              } else {
-                timerTd.textContent = "Время истекло";
-                if (!est.expired) {
-                  // Обновляем запись, чтобы отметить истечение времени
+            if (!est.expired) { // Обновляем таймер для активного заведения
+              const timerTd = document.getElementById("timer-" + est.id);
+              if (timerTd) {
+                const now = new Date();
+                const offlineUntil = new Date(est.offlineUntil);
+                const remainingMs = offlineUntil - now;
+                if (remainingMs > 0) {
+                  const minutes = Math.floor(remainingMs / 60000);
+                  const seconds = Math.floor((remainingMs % 60000) / 1000);
+                  timerTd.textContent = `${minutes} мин ${seconds} сек`;
+                } else {
+                  timerTd.textContent = "Время истекло";
+                  // Если время истекло – обновляем запись и переводим в историю
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `Оффлайн время истекло для заведения: ${est.name}.\n(${est.url})`;
+                      const text = `Оффлайн время истекло для заведения: ${est.name}.
+(${est.url})`;
                       sendWebhook(text);
                     }
                   });
@@ -212,9 +246,11 @@
         const est = snapshot.val();
         if (est) {
           const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+          // Обновляем время и снимаем флаг expired, чтобы заведение вернулось в активные
           ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
             if (!error) {
-              const text = `Для заведения ${est.name} добавлено дополнительное время (${additionalTime} мин).\nНовый оффлайн до: ${newOfflineUntil.toLocaleString()}.`;
+              const text = `Для заведения ${est.name} добавлено дополнительное время (${additionalTime} мин).
+Новый оффлайн до: ${newOfflineUntil.toLocaleString()}.`;
               sendWebhook(text);
             }
           });
