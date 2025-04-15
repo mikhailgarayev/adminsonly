@@ -68,7 +68,7 @@
       font-weight: 500;
       margin-bottom: 4px;
     }
-    /* Input fields styling */
+    /* Input fields */
     select,
     input[type="text"],
     input[type="url"],
@@ -86,11 +86,11 @@
     }
     /* Custom select arrow */
     select {
-      appearance: none;
+      appearance: none; 
       -webkit-appearance: none;
       -moz-appearance: none;
       background: url('icon-arrow.svg') no-repeat 95% center / 16px 16px, #fff;
-      padding-right: 2.5rem;
+      padding-right: 2.5rem; 
     }
     select::-ms-expand {
       display: none;
@@ -147,14 +147,14 @@
     a:hover {
       text-decoration: underline;
     }
-    /* Progress bar styles */
+    /* Progress bar */
     .progress-container {
       width: 100px;
       height: 10px;
       background-color: #ddd;
       border-radius: 5px;
       overflow: hidden;
-      margin: 0 auto 4px auto;
+      margin: 0 auto 4px auto; 
       position: relative;
     }
     .progress-fill {
@@ -214,7 +214,7 @@
           </tr>
         </thead>
         <tbody>
-          <!-- Active venues will be rendered here -->
+          <!-- If no active venues, we'll show "No active venues" -->
         </tbody>
       </table>
       
@@ -237,7 +237,7 @@
   </div>
 
   <script>
-    // ===================== 1. FIREBASE INITIALIZATION =====================
+    // 1) Firebase initialization
     const firebaseConfig = {
       apiKey: "AIzaSyBaQYzQmld5VNA_wSI8nDtqENN0TgcNqeA",
       authDomain: "adminsonly.firebaseapp.com",
@@ -250,58 +250,47 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // ===================== 2. SLACK WEBHOOK URLS =====================
+    // 2) Single webhook
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    // Замените на URL для второго канала (simo)
-    const simoWebhookURL = "https://hooks.slack.com/triggers/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"; 
 
-    // Функция отправки уведомлений в оба канала
-    function sendWebhookToBoth(text, simoText) {
-      const payload1 = { text: text };
-      const payload2 = { simoText: simoText };
-
+    // One function, sending both text & simotext in the same payload
+    function sendWebhookToBoth(text, simotext) {
+      const payload = {
+        text: text,        // first channel
+        simotext: simotext // second channel
+      };
       fetch(slackWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload1)
+        body: JSON.stringify(payload)
       })
-      .then(() => console.log("Primary webhook sent."))
-      .catch(err => console.error("Primary webhook error:", err));
-
-      fetch(simoWebhookURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload2)
-      })
-      .then(() => console.log("Simo webhook sent."))
-      .catch(err => console.error("Simo webhook error:", err));
+      .then(() => console.log("Workflow webhook sent with text & simotext."))
+      .catch(err => console.error("Webhook error:", err));
     }
 
-    // ===================== 3. ADD VENUE FUNCTION =====================
+    // 3) Add Venue function
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
-      // Save creation time for progress bar logic:
       establishment.createdAt = new Date().toISOString();
-      // Initially, graceExpiresAt is not set
       establishment.graceExpiresAt = null;
 
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}`;
-          const simoText = `📢 Alert: ${establishment.name} set to admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason} / By: ${establishment.addedBy}`;
-          sendWebhookToBoth(text, simoText);
+          const text = `📢 The ${establishment.name} venue was set to admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}`;
+          const simotext = `📢 Alert: ${establishment.name} was set to admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason} / By: ${establishment.addedBy}`;
+          sendWebhookToBoth(text, simotext);
         } else {
           console.error("Save error:", error);
         }
       });
     }
 
+    // Store
     let currentEstablishments = [];
 
-    // ===================== 4. SUBSCRIBE TO DATABASE UPDATES =====================
+    // 4) Subscribe
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -311,7 +300,7 @@
       });
     }
 
-    // ===================== 5. RENDER DASHBOARDS =====================
+    // 5) Render
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
@@ -322,15 +311,15 @@
 
       establishments.forEach(est => {
         if (est.expired) {
-          // Render in History
+          // history
           const tr = document.createElement("tr");
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
 
-          const tdAddedBy = document.createElement("td");
-          tdAddedBy.textContent = est.addedBy || "";
-          tr.appendChild(tdAddedBy);
+          const tdBy = document.createElement("td");
+          tdBy.textContent = est.addedBy || "";
+          tr.appendChild(tdBy);
 
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
@@ -344,22 +333,23 @@
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
 
-          const tdOfflineUntil = document.createElement("td");
-          tdOfflineUntil.textContent = new Date(est.offlineUntil).toLocaleString();
-          tr.appendChild(tdOfflineUntil);
+          const tdOffline = document.createElement("td");
+          tdOffline.textContent = new Date(est.offlineUntil).toLocaleString();
+          tr.appendChild(tdOffline);
 
           historyTbody.appendChild(tr);
         } else {
+          // active
           activeCount++;
-          // Render active venue
           const tr = document.createElement("tr");
+
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
 
-          const tdAddedBy = document.createElement("td");
-          tdAddedBy.textContent = est.addedBy || "";
-          tr.appendChild(tdAddedBy);
+          const tdBy = document.createElement("td");
+          tdBy.textContent = est.addedBy || "";
+          tr.appendChild(tdBy);
 
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
@@ -373,22 +363,22 @@
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
 
-          // Cell for progress bar and time left text
+          // time + bar
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
 
           const progressContainer = document.createElement("div");
           progressContainer.className = "progress-container";
-          progressContainer.id = "progressBar-" + est.id;
+          progressContainer.id = `progressBar-${est.id}`;
 
           const progressFill = document.createElement("div");
           progressFill.className = "progress-fill";
-          progressFill.id = "progressFill-" + est.id;
+          progressFill.id = `progressFill-${est.id}`;
           progressContainer.appendChild(progressFill);
 
           const timeText = document.createElement("div");
           timeText.className = "time-text";
-          timeText.id = "timeText-" + est.id;
+          timeText.id = `timeText-${est.id}`;
 
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
@@ -397,31 +387,27 @@
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
           tdAction.style.flexDirection = "column";
-          tdAction.style.gap = "8px"; // increased spacing between buttons
+          tdAction.style.gap = "8px";
 
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
-          addTimeBtn.addEventListener("click", function() {
-            addExtraTime(est.id);
-          });
+          addTimeBtn.addEventListener("click", () => addExtraTime(est.id));
           tdAction.appendChild(addTimeBtn);
 
           if (est.graceExpiresAt) {
-            const setExpiredBtn = document.createElement("button");
-            setExpiredBtn.textContent = "Set Expired";
-            setExpiredBtn.style.marginLeft = "5px";
-            setExpiredBtn.style.marginTop = "5px";
-            setExpiredBtn.addEventListener("click", function() {
-              setExpiredNow(est.id);
-            });
-            tdAction.appendChild(setExpiredBtn);
+            const setExpBtn = document.createElement("button");
+            setExpBtn.textContent = "Set Expired";
+            setExpBtn.style.marginTop = "5px";
+            setExpBtn.addEventListener("click", () => setExpiredNow(est.id));
+            tdAction.appendChild(setExpBtn);
           }
-          tr.appendChild(tdAction);
 
+          tr.appendChild(tdAction);
           activeTbody.appendChild(tr);
         }
       });
 
+      // No active if count=0
       if (activeCount === 0) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
@@ -432,15 +418,15 @@
       }
     }
 
-    // ===================== 6. UPDATE TIMERS WITH GRACE PERIOD (10 min) + PROGRESS =====================
+    // 6) Timers + Grace period + bar
     function updateTimers() {
       const now = Date.now();
 
       currentEstablishments.forEach(est => {
         if (!est.expired) {
-          const progressBar = document.getElementById("progressBar-" + est.id);
-          const progressFill = document.getElementById("progressFill-" + est.id);
-          const timeTextEl = document.getElementById("timeText-" + est.id);
+          const progressBar = document.getElementById(`progressBar-${est.id}`);
+          const progressFill = document.getElementById(`progressFill-${est.id}`);
+          const timeTextEl = document.getElementById(`timeText-${est.id}`);
           if (!progressBar || !progressFill || !timeTextEl) return;
 
           const offlineUntilTime = new Date(est.offlineUntil).getTime();
@@ -452,17 +438,20 @@
             let ratio = remainingMs / totalMs;
             if (ratio < 0) ratio = 0;
             if (ratio > 1) ratio = 1;
+
             progressFill.style.width = (ratio * 100) + "%";
             const minutes = Math.floor(remainingMs / 60000);
             const seconds = Math.floor((remainingMs % 60000) / 1000);
             timeTextEl.textContent = `${minutes} min ${seconds} sec`;
+
           } else {
+            // offlineTime done
             if (!est.graceExpiresAt) {
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              const text = `📢 Admins only time expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-              const simoText = `📢 Alert: ${est. name} admins only time expired. Extra time can be added within 10 minutes, or press "Set Expired" and set venue to public.\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}`;
-              sendWebhookToBoth(text, simoText);
+              const text = `📢 Admins only time fully expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
+              const simotext = ` Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
+              sendWebhookToBoth(text, simotext);
               est.graceExpiresAt = graceExpires;
               progressFill.style.width = "0%";
               timeTextEl.textContent = "Grace: 10 min 0 sec";
@@ -475,11 +464,11 @@
                 progressFill.style.width = "0%";
                 timeTextEl.textContent = `Grace: ${minutes} min ${seconds} sec`;
               } else {
-                db.ref("establishments/" + est.id).update({ expired: true }, error => {
-                  if (!error) {
-                    const text = `📢 Admins only time fully expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-                    const simoText = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}\n⚠️ Please, set the venue to public.`;
-                    sendWebhookToBoth(text, simoText);
+                db.ref("establishments/" + est.id).update({ expired: true }, err => {
+                  if (!err) {
+                    const text = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+                    const simotext = `SIMO: ${est.name} is fully expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+                    sendWebhookToBoth(text, simotext);
                   }
                 });
               }
@@ -489,29 +478,30 @@
       });
     }
 
-    // ===================== 7. ADD EXTRA TIME =====================
+    // 7) Add Extra Time
     function addExtraTime(id) {
-      const additionalTime = prompt("Enter additional time (in minutes):");
-      if (!additionalTime) return;
+      const val = prompt("Enter additional time (in minutes):");
+      if (!val) return;
       const ref = db.ref("establishments/" + id);
-      ref.once("value", snapshot => {
-        const est = snapshot.val();
+      ref.once("value", snap => {
+        const est = snap.val();
         if (!est) return;
-        const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
-        const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+        const addMs = parseInt(val, 10) * 60 * 1000;
+        const newOffline = new Date(new Date(est.offlineUntil).getTime() + addMs);
         ref.update({
-          offlineUntil: newOfflineUntil.toISOString(),
+          offlineUntil: newOffline.toISOString(),
           expired: false,
           graceExpiresAt: null,
           createdAt: new Date().toISOString()
-        }, error => {
-          if (!error) {
+        }, err => {
+          if (!err) {
             const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-            const simoText = `🔕 Extra time (${additionalTime} min) added for ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
-            sendWebhookToBoth(text, simoText);
-            db.ref("establishments").once("value", snap => {
-              const data = snap.val();
-              currentEstablishments = data ? Object.values(data) : [];
+            const simotext = `🔕 Extra time (${additionalTime} min) added for ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+            sendWebhookToBoth(text, simotext);
+
+            db.ref("establishments").once("value", s => {
+              const d = s.val();
+              currentEstablishments = d ? Object.values(d) : [];
               renderDashboards(currentEstablishments);
             });
           }
@@ -519,53 +509,29 @@
       });
     }
 
-    // ===================== 8. SET EXPIRED NOW =====================
+    // 8) Set Expired Now
     function setExpiredNow(id) {
       const ref = db.ref("establishments/" + id);
-      ref.update({ expired: true }, error => {
-        if (!error) {
+      ref.update({ expired: true }, err => {
+        if (!err) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `🔕 Admins only status expired for venue: ${est.name}\n\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
-            const simoText = `🔕 Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}\n⚠️ Please, set the venue to public.`;
-            sendWebhookToBoth(text, simoText);
+            const text = `🔕 Admins only status expired for venue: ${est.name}\nReason was: ${est.reason} / By: ${est.addedBy}`;
+            const simotext = ` Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
+            sendWebhookToBoth(text, simotext);
           });
         }
       });
     }
 
-    // ===================== 9. SEND WEBHOOK TO BOTH CHANNELS =====================
-    function sendWebhookToBoth(text, simoText) {
-      const payload1 = { text: text };
-      fetch(slackWebhookURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload1)
-      })
-      .then(() => console.log("Primary webhook sent."))
-      .catch(err => console.error("Primary webhook error:", err));
-
-      const payload2 = { simoText: simoText };
-      // Замените simoWebhookURL на рабочий URL для второго канала
-      fetch(simoWebhookURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload2)
-      })
-      .then(() => console.log("Simo webhook sent."))
-      .catch(err => console.error("Simo webhook error:", err));
-    }
-
-    // ===================== 10. INITIALIZATION =====================
+    // 9) Update Timers
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // ===================== 11. FORM HANDLING =====================
-    document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
+    // 10) Form Handling
+    document.getElementById("addEstablishmentForm").addEventListener("submit", e => {
       e.preventDefault();
       const addedBy = document.getElementById("addedBy").value;
       const name = document.getElementById("name").value;
@@ -574,19 +540,18 @@
       const reason = document.getElementById("reason").value;
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
-      
+
       const establishment = {
-        addedBy: addedBy,
-        name: name,
-        url: url,
+        addedBy,
+        name,
+        url,
         offlineUntil: offlineUntil.toISOString(),
         addedOfflineTime: offlineTimeMinutes,
-        reason: reason,
+        reason,
         expired: false,
         graceExpiresAt: null,
         createdAt: now.toISOString()
       };
-      
       addEstablishment(establishment);
       e.target.reset();
     });
