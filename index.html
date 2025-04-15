@@ -367,7 +367,7 @@ Reason: ${establishment.reason}.;
                 // Send notification about grace period start
                 const text = `Offline time expired for venue: ${est.name}.
 You can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.
-(${est.url} )
+URL: ${est.url}
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
                 sendWebhook(text);
