@@ -449,8 +449,8 @@
             if (!est.graceExpiresAt) {
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              const text = `📢 Admins only time fully expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-              const simotext = ` Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
+              const text = `📢 Admins only time expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
+              const simotext = `📢 Alert: ${est. name} admins only time expired. Extra time can be added within 10 minutes, or press "Set Expired" and set venue to public.\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}`;
               sendWebhookToBoth(text, simotext);
               est.graceExpiresAt = graceExpires;
               progressFill.style.width = "0%";
@@ -466,8 +466,8 @@
               } else {
                 db.ref("establishments/" + est.id).update({ expired: true }, err => {
                   if (!err) {
-                    const text = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
-                    const simotext = `SIMO: ${est.name} is fully expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+                    const text = `📢 Admins only time fully expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
+                    const simotext = `📢 Alert: Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public.`;
                     sendWebhookToBoth(text, simotext);
                   }
                 });
