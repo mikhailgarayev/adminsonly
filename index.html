@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Admins only Venues Management dashboard</title>
+  <title>Offline Venues Management</title>
   <!-- Include Firebase SDK (compat versions for simplicity) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -114,7 +114,7 @@
   </style>
 </head>
 <body>
-  <h1 class="site-title">Admins only Venues Management dashboard</h1>
+  <h1 class="site-title">Offline Venues Management</h1>
   <div class="card">
     <!-- Form section to add a venue -->
     <div class="form-section">
@@ -224,9 +224,11 @@
       establishment.id = newRef.key;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `${establishment.name} venue was set admins only due to ${establishment.reason} by ${establishment.addedBy}.
-Venue URL: ${establishment.url}.
+          const text = `Added Venue: ${establishment.name}.
+URL: ${establishment.url}.
 Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
+Reason: ${establishment.reason}.
+Added By: ${establishment.addedBy}`;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
@@ -342,7 +344,7 @@ Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
                   timerTd.textContent = "Time Expired";
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `Admins only time expired for venue: ${est.name}.
+                      const text = `Offline time expired for venue: ${est.name}.
 (${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
