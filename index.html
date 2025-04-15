@@ -376,7 +376,7 @@
                 const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
                 db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
                 // Send notification about grace period start
-                const text = `📢 Offline time expired for venue: ${est.name}\nYou can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.\n🔗 ${est.url}\nReason: ${est.reason}.\nAdded By: ${est.addedBy}`;
+                const text = `📢 Admins only time expired for venue: ${est.name}\nYou can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.\n🔗 ${est.url}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
                 sendWebhook(text);
                 // Update local object
                 est.graceExpiresAt = graceExpires;
@@ -393,7 +393,7 @@
                   // Grace period is over—mark as expired
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `📢 Offline time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
+                      const text = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
                       sendWebhook(text);
                     }
                   });
@@ -423,7 +423,7 @@
           graceExpiresAt: null
         }, error => {
           if (!error) {
-            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
+            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
             sendWebhook(text);
             // Force re-read to update local data and UI
             db.ref("establishments").once("value", snap => {
