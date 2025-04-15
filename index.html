@@ -60,6 +60,7 @@
       color: #333;
       font-weight: 500;
     }
+    /* Настройка полей ввода */
     select, input[type="text"], input[type="url"], input[type="number"] {
       width: 100%;
       padding: 10px;
@@ -71,6 +72,18 @@
     }
     select:focus, input:focus {
       border-color: #00a9dc;
+    }
+    /* Исправление стрелочки в select */
+    select {
+      appearance: none;            /* Отключаем стандартное оформление */
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: url('icon-arrow.svg') no-repeat 95% center / 16px 16px, #fff;
+      padding-right: 2.5rem;       /* Отступ справа под иконку */
+    }
+    /* Для IE/Edge */
+    select::-ms-expand {
+      display: none;
     }
     button {
       margin-top: 10px;
@@ -230,9 +243,11 @@
       establishment.graceExpiresAt = null;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `${establishment.name} was set Admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}`
+          const text = `Added Venue: ${establishment.name}
 URL: ${establishment.url}.
-Reason: ${establishment.reason}.;
+Offline Until: ${new Date(establishment.offlineUntil).toLocaleString()}.
+Reason: ${establishment.reason}.
+Added By: ${establishment.addedBy}`;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
@@ -344,7 +359,7 @@ Reason: ${establishment.reason}.;
       });
     }
 
-    // ===================== 6. UPDATE TIMERS WITH GRACE PERIOD =====================
+    // ===================== 6. UPDATE TIMERS WITH GRACE PERIOD (10 min) =====================
     function updateTimers() {
       const now = Date.now();
       currentEstablishments.forEach(est => {
@@ -367,7 +382,7 @@ Reason: ${establishment.reason}.;
                 // Send notification about grace period start
                 const text = `Offline time expired for venue: ${est.name}.
 You can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.
-URL: ${est.url}
+(${est.url})
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
                 sendWebhook(text);
@@ -412,7 +427,7 @@ Added By: ${est.addedBy}`;
         const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
         // Calculate new offlineUntil based on current offlineUntil
         const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-        // Update: new offlineUntil and clear graceExpiresAt (set to null)
+        // Update record: new offlineUntil and clear graceExpiresAt (set to null)
         ref.update({
           offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
