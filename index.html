@@ -243,7 +243,7 @@
       establishment.graceExpiresAt = null;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nURL: ${establishment.url}\nReason: ${establishment.reason}`;
+          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}`;
           sendWebhook(text);
         } else {
           console.error("Save error:", error);
@@ -376,11 +376,7 @@
                 const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
                 db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
                 // Send notification about grace period start
-                const text = `Offline time expired for venue: ${est.name}.
-You can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.
-(${est.url})
-Reason: ${est.reason}.
-Added By: ${est.addedBy}`;
+                const text = `📢 Offline time expired for venue: ${est.name}\nYou can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.\n🔗 ${est.url}\nReason: ${est.reason}.\nAdded By: ${est.addedBy}`;
                 sendWebhook(text);
                 // Update local object
                 est.graceExpiresAt = graceExpires;
@@ -397,10 +393,7 @@ Added By: ${est.addedBy}`;
                   // Grace period is over—mark as expired
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
-                      const text = `Offline time fully expired for venue: ${est.name}.
-(${est.url})
-Reason: ${est.reason}.
-Added By: ${est.addedBy}`;
+                      const text = `📢 Offline time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
                       sendWebhook(text);
                     }
                   });
@@ -430,10 +423,7 @@ Added By: ${est.addedBy}`;
           graceExpiresAt: null
         }, error => {
           if (!error) {
-            const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
-New offline until: ${newOfflineUntil.toLocaleString()}.
-Reason: ${est.reason}.
-Added By: ${est.addedBy}`;
+            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
             sendWebhook(text);
             // Force re-read to update local data and UI
             db.ref("establishments").once("value", snap => {
@@ -453,7 +443,7 @@ Added By: ${est.addedBy}`;
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `Admins only status expired for venue: ${est.name}\nVenue url: (${est.url})\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
+            const text = `🔕 Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nAdded By: ${est.addedBy}`;
             sendWebhook(text);
           });
         }
