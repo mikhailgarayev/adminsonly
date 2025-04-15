@@ -88,18 +88,19 @@
     const db = firebase.database();
 
     // ===================== 2. SLACK WEBHOOK =====================
-    // URL вашего Slack вебхука
+    // URL вашего Slack вебхука (убедитесь, что он корректный)
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
 
-    // Функция отправки уведомлений через Slack вебхук
+    // Функция отправки уведомлений через Slack вебхук.
+    // Используем "no-cors" для обхода CORS-блокировки.
     function sendWebhook(text) {
       fetch(slackWebhookURL, {
         method: "POST",
+        mode: "no-cors",  // Важно: использование no-cors, чтобы избежать блокировки браузером
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text })
       })
-      .then(response => response.text())
-      .then(data => console.log("Вебхук ответ:", data))
+      .then(() => console.log("Вебхук отправлен."))
       .catch(err => console.error("Ошибка вебхука:", err));
     }
 
@@ -170,7 +171,6 @@
 
     // ===================== 6. ОБНОВЛЕНИЕ ТАЙМЕРОВ =====================
     function updateTimers() {
-      // Получаем данные для обновления таймеров
       db.ref("establishments").once("value", snapshot => {
         const data = snapshot.val();
         if (data) {
@@ -187,7 +187,7 @@
               } else {
                 timerTd.textContent = "Время истекло";
                 if (!est.expired) {
-                  // Если время истекло – обновляем запись для отметки истечения
+                  // Обновляем запись, чтобы отметить истечение времени
                   db.ref("establishments/" + est.id).update({ expired: true }, error => {
                     if (!error) {
                       const text = `Оффлайн время истекло для заведения: ${est.name}.\n(${est.url})`;
@@ -225,7 +225,6 @@
     // ===================== 8. ИНИЦИАЛИЗАЦИЯ =====================
     window.addEventListener("load", () => {
       subscribeToDashboard();
-      // Обновляем таймеры каждую секунду
       setInterval(updateTimers, 1000);
     });
 
