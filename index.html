@@ -200,14 +200,9 @@
     const db = firebase.database();
 
     // ===================== 2. SLACK WEBHOOK =====================
-    // Use your Slack Workflow Web Request URL
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    // Function to send notifications using only the text field
     function sendWebhook(text) {
-      const payload = {
-        text: text
-      };
-
+      const payload = { text: text };
       fetch(slackWebhookURL, {
         method: "POST",
         mode: "no-cors",
@@ -236,7 +231,7 @@ Added By: ${establishment.addedBy}`;
       });
     }
 
-    // Global variable to hold the current establishments data
+    // Keep track of the latest data from the DB
     let currentEstablishments = [];
 
     // ===================== 4. SUBSCRIBE TO DATABASE UPDATES =====================
@@ -329,22 +324,23 @@ Added By: ${establishment.addedBy}`;
     }
 
     // ===================== 6. UPDATE TIMERS =====================
-    // Modified to use the global currentEstablishments array rather than a separate DB query.
     function updateTimers() {
+      // Use currentEstablishments so we have the latest data from subscribeToDashboard
       currentEstablishments.forEach(est => {
         if (!est.expired) {
+          const now = Date.now();
+          const offlineUntilTime = new Date(est.offlineUntil).getTime();
           const timerTd = document.getElementById("timer-" + est.id);
+
           if (timerTd) {
-            const now = new Date();
-            const offlineUntil = new Date(est.offlineUntil);
-            const remainingMs = offlineUntil - now;
+            const remainingMs = offlineUntilTime - now;
             if (remainingMs > 0) {
               const minutes = Math.floor(remainingMs / 60000);
               const seconds = Math.floor((remainingMs % 60000) / 1000);
               timerTd.textContent = `${minutes} min ${seconds} sec`;
             } else {
               timerTd.textContent = "Time Expired";
-              // Only mark as expired if not updated by extra time already.
+              // Mark as expired in DB if not updated
               db.ref("establishments/" + est.id).update({ expired: true }, error => {
                 if (!error) {
                   const text = `Offline time expired for venue: ${est.name}.
@@ -364,30 +360,43 @@ Added By: ${est.addedBy}`;
     function addExtraTime(id) {
       const additionalTime = prompt("Enter additional time (in minutes):");
       if (!additionalTime) return;
-      const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
+
       const ref = db.ref("establishments/" + id);
       ref.once("value", snapshot => {
         const est = snapshot.val();
-        if (est) {
-          // Calculate new offlineUntil based on the current offlineUntil value
-          const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-          // Update offlineUntil and ensure expired is set to false
-          ref.update({ offlineUntil: newOfflineUntil, expired: false }, error => {
-            if (!error) {
-              const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
+        if (!est) return;
+
+        // Calculate new offlineUntil
+        const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
+        const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+
+        // Update the record so it remains active
+        ref.update({
+          offlineUntil: newOfflineUntil.toISOString(),
+          expired: false
+        }, error => {
+          if (!error) {
+            const text = `Added extra time (${additionalTime} min) for venue ${est.name}.
 New offline until: ${newOfflineUntil.toLocaleString()}.
 Reason: ${est.reason}.
 Added By: ${est.addedBy}`;
-              sendWebhook(text);
-            }
-          });
-        }
+            sendWebhook(text);
+
+            // Force a fresh read from DB so local array is up to date
+            db.ref("establishments").once("value", snap => {
+              const data = snap.val();
+              currentEstablishments = data ? Object.values(data) : [];
+              renderDashboards(currentEstablishments);
+            });
+          }
+        });
       });
     }
 
     // ===================== 8. INITIALIZATION =====================
     window.addEventListener("load", () => {
       subscribeToDashboard();
+      // Update timers every second
       setInterval(updateTimers, 1000);
     });
 
