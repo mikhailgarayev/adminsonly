@@ -6,7 +6,7 @@
   <!-- Include Firebase SDK (compat versions for simplicity) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <!-- Google Fonts (например, Poppins) -->
+  <!-- Google Fonts (Poppins) -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap">
   <style>
     /* Reset */
@@ -68,7 +68,7 @@
       font-weight: 500;
       margin-bottom: 4px;
     }
-    /* Input fields */
+    /* Input fields styling */
     select,
     input[type="text"],
     input[type="url"],
@@ -86,11 +86,11 @@
     }
     /* Custom select arrow */
     select {
-      appearance: none; 
+      appearance: none;
       -webkit-appearance: none;
       -moz-appearance: none;
       background: url('icon-arrow.svg') no-repeat 95% center / 16px 16px, #fff;
-      padding-right: 2.5rem; 
+      padding-right: 2.5rem;
     }
     select::-ms-expand {
       display: none;
@@ -124,8 +124,7 @@
       background: #fff;
       margin-bottom: 20px;
     }
-    th,
-    td {
+    th, td {
       border: 1px solid #eee;
       padding: 12px;
       text-align: center;
@@ -147,14 +146,14 @@
     a:hover {
       text-decoration: underline;
     }
-    /* Progress bar */
+    /* Progress bar styles */
     .progress-container {
       width: 100px;
       height: 10px;
       background-color: #ddd;
       border-radius: 5px;
       overflow: hidden;
-      margin: 0 auto 4px auto; 
+      margin: 0 auto 4px auto;
       position: relative;
     }
     .progress-fill {
@@ -178,23 +177,18 @@
       <form id="addEstablishmentForm">
         <label>Your e-mail:</label>
         <input type="text" id="addedBy" required>
-
         <label>Venue Name:</label>
         <input type="text" id="name" required>
-
         <label>Venue page URL:</label>
         <input type="url" id="url" required>
-
         <label>Offline time (in minutes):</label>
         <input type="number" id="offlineTime" required>
-
         <label>Reason for Offline:</label>
         <select id="reason" required>
           <option value="" disabled selected>Select reason</option>
           <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
           <option value="Venue sets itself online">Venue sets itself online</option>
         </select>
-
         <button type="submit">Add venue</button>
       </form>
     </div>
@@ -214,7 +208,7 @@
           </tr>
         </thead>
         <tbody>
-          <!-- If no active venues, we'll show "No active venues" -->
+          <!-- Active venues will be rendered here -->
         </tbody>
       </table>
       
@@ -237,7 +231,7 @@
   </div>
 
   <script>
-    // 1) Firebase initialization
+    // 1. Firebase initialization
     const firebaseConfig = {
       apiKey: "AIzaSyBaQYzQmld5VNA_wSI8nDtqENN0TgcNqeA",
       authDomain: "adminsonly.firebaseapp.com",
@@ -250,15 +244,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2) Single webhook
+    // 2. Slack webhook URL (один, который выполняет оба шага)
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-
-    // One function, sending both text & simotext in the same payload
+    // Функция отправки уведомлений в один вебхук с полями text и simotext
     function sendWebhookToBoth(text, simotext) {
-      const payload = {
-        text: text,        // first channel
-        simotext: simotext // second channel
-      };
+      const payload = { text: text, simotext: simotext };
       fetch(slackWebhookURL, {
         method: "POST",
         mode: "no-cors",
@@ -269,17 +259,16 @@
       .catch(err => console.error("Webhook error:", err));
     }
 
-    // 3) Add Venue function
+    // 3. Add venue function
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
       establishment.createdAt = new Date().toISOString();
       establishment.graceExpiresAt = null;
-
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `📢 The ${establishment.name} venue was set to admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}`;
-          const simotext = `📢 Alert: ${establishment.name} was set to admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason} / By: ${establishment.addedBy}`;
+          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}`;
+          const simotext = `SIMO: ${establishment.name} is admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
           sendWebhookToBoth(text, simotext);
         } else {
           console.error("Save error:", error);
@@ -287,10 +276,9 @@
       });
     }
 
-    // Store
     let currentEstablishments = [];
 
-    // 4) Subscribe
+    // 4. Subscribe to database updates
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -300,31 +288,26 @@
       });
     }
 
-    // 5) Render
+    // 5. Render dashboards
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
       activeTbody.innerHTML = "";
       historyTbody.innerHTML = "";
-
       let activeCount = 0;
-
       establishments.forEach(est => {
         if (est.expired) {
-          // history
+          // Render in History
           const tr = document.createElement("tr");
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
-
           const tdBy = document.createElement("td");
           tdBy.textContent = est.addedBy || "";
           tr.appendChild(tdBy);
-
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
           tr.appendChild(tdReason);
-
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -332,29 +315,23 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-
           const tdOffline = document.createElement("td");
           tdOffline.textContent = new Date(est.offlineUntil).toLocaleString();
           tr.appendChild(tdOffline);
-
           historyTbody.appendChild(tr);
         } else {
-          // active
           activeCount++;
+          // Render active venue
           const tr = document.createElement("tr");
-
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
-
           const tdBy = document.createElement("td");
           tdBy.textContent = est.addedBy || "";
           tr.appendChild(tdBy);
-
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
           tr.appendChild(tdReason);
-
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -362,38 +339,34 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-
-          // time + bar
+          
+          // Progress bar and time left cell
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
-
           const progressContainer = document.createElement("div");
           progressContainer.className = "progress-container";
           progressContainer.id = `progressBar-${est.id}`;
-
           const progressFill = document.createElement("div");
           progressFill.className = "progress-fill";
           progressFill.id = `progressFill-${est.id}`;
           progressContainer.appendChild(progressFill);
-
           const timeText = document.createElement("div");
           timeText.className = "time-text";
           timeText.id = `timeText-${est.id}`;
-
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
-
+          
+          // Actions cell
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
           tdAction.style.flexDirection = "column";
           tdAction.style.gap = "8px";
-
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
           addTimeBtn.addEventListener("click", () => addExtraTime(est.id));
           tdAction.appendChild(addTimeBtn);
-
+          
           if (est.graceExpiresAt) {
             const setExpBtn = document.createElement("button");
             setExpBtn.textContent = "Set Expired";
@@ -401,13 +374,10 @@
             setExpBtn.addEventListener("click", () => setExpiredNow(est.id));
             tdAction.appendChild(setExpBtn);
           }
-
           tr.appendChild(tdAction);
           activeTbody.appendChild(tr);
         }
       });
-
-      // No active if count=0
       if (activeCount === 0) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
@@ -418,17 +388,15 @@
       }
     }
 
-    // 6) Timers + Grace period + bar
+    // 6. Update timers with grace period (10 min) and progress bar
     function updateTimers() {
       const now = Date.now();
-
       currentEstablishments.forEach(est => {
         if (!est.expired) {
           const progressBar = document.getElementById(`progressBar-${est.id}`);
           const progressFill = document.getElementById(`progressFill-${est.id}`);
           const timeTextEl = document.getElementById(`timeText-${est.id}`);
           if (!progressBar || !progressFill || !timeTextEl) return;
-
           const offlineUntilTime = new Date(est.offlineUntil).getTime();
           const createdTime = new Date(est.createdAt || new Date()).getTime();
           
@@ -438,19 +406,16 @@
             let ratio = remainingMs / totalMs;
             if (ratio < 0) ratio = 0;
             if (ratio > 1) ratio = 1;
-
             progressFill.style.width = (ratio * 100) + "%";
             const minutes = Math.floor(remainingMs / 60000);
             const seconds = Math.floor((remainingMs % 60000) / 1000);
             timeTextEl.textContent = `${minutes} min ${seconds} sec`;
-
           } else {
-            // offlineTime done
             if (!est.graceExpiresAt) {
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              const text = `📢 Admins only time expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-              const simotext = `📢 Alert: ${est. name} admins only time expired. Extra time can be added within 10 minutes, or press "Set Expired" and set venue to public.\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}`;
+              const text = `📢 Admins only time expired for venue: ${est.name}\nYou can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}`;
+              const simotext = `SIMO: ${est.name} admins only time expired. Add extra time within 10 minutes or press "Set Expired".\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
               sendWebhookToBoth(text, simotext);
               est.graceExpiresAt = graceExpires;
               progressFill.style.width = "0%";
@@ -464,10 +429,10 @@
                 progressFill.style.width = "0%";
                 timeTextEl.textContent = `Grace: ${minutes} min ${seconds} sec`;
               } else {
-                db.ref("establishments/" + est.id).update({ expired: true }, err => {
-                  if (!err) {
-                    const text = `📢 Admins only time automatically expired for venue: ${est.name}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-                    const simotext = `📢 Alert: Admins only time automatically expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public and provide update in the #aze-sales-feedback.`;
+                db.ref("establishments/" + est.id).update({ expired: true }, error => {
+                  if (!error) {
+                    const text = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+                    const simotext = `SIMO: ${est.name} is fully expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
                     sendWebhookToBoth(text, simotext);
                   }
                 });
@@ -478,60 +443,62 @@
       });
     }
 
-    // 7) Add Extra Time
+    // 7. Add Extra Time
     function addExtraTime(id) {
-      const val = prompt("Enter additional time (in minutes):");
-      if (!val) return;
+      const additionalTime = prompt("Enter additional time (in minutes):");
+      if (!additionalTime) return;
       const ref = db.ref("establishments/" + id);
-      ref.once("value", snap => {
-        const est = snap.val();
+      ref.once("value", snapshot => {
+        const est = snapshot.val();
         if (!est) return;
-        const addMs = parseInt(val, 10) * 60 * 1000;
-        const newOffline = new Date(new Date(est.offlineUntil).getTime() + addMs);
+        const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
+        const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+        // Update record: new offlineUntil, clear graceExpiresAt, update createdAt to reset progress bar
         ref.update({
-          offlineUntil: newOffline.toISOString(),
+          offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
           graceExpiresAt: null,
           createdAt: new Date().toISOString()
-        }, err => {
-          if (!err) {
-            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason} / Added By: ${est.addedBy}`;
-            const simotext = `🔕 Extra time (${additionalTime} min) added for ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+        }, error => {
+          if (!error) {
+            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason} / By: ${est.addedBy}`;
+            const simotext = `SIMO: Extra ${additionalTime} min for ${est.name}\nOffline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
             sendWebhookToBoth(text, simotext);
-
-            db.ref("establishments").once("value", s => {
-              const d = s.val();
-              currentEstablishments = d ? Object.values(d) : [];
+            db.ref("establishments").once("value", snap => {
+              const data = snap.val();
+              currentEstablishments = data ? Object.values(data) : [];
               renderDashboards(currentEstablishments);
             });
+          } else {
+            console.error("Update error:", error);
           }
         });
       });
     }
 
-    // 8) Set Expired Now
+    // 8. Set Expired Now
     function setExpiredNow(id) {
       const ref = db.ref("establishments/" + id);
-      ref.update({ expired: true }, err => {
-        if (!err) {
+      ref.update({ expired: true }, error => {
+        if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `🔕 Admins only status set manually expired for venue: ${est.name}\nReason was: ${est.reason} / By: ${est.addedBy}`;
-            const simotext = `🔕 Admins only status set manually expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason} / Added By: ${est.addedBy}\n⚠️ Please, do not forget to set the venue to public and provide update in the #aze-sales-feedback.`;
+            const text = `🔕 Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+            const simotext = `SIMO: ${est.name} set to expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
             sendWebhookToBoth(text, simotext);
           });
         }
       });
     }
 
-    // 9) Update Timers
+    // 9. Initialization: subscribe and update timers
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // 10) Form Handling
-    document.getElementById("addEstablishmentForm").addEventListener("submit", e => {
+    // 10. Form handling
+    document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const addedBy = document.getElementById("addedBy").value;
       const name = document.getElementById("name").value;
@@ -540,14 +507,13 @@
       const reason = document.getElementById("reason").value;
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
-
       const establishment = {
-        addedBy,
-        name,
-        url,
+        addedBy: addedBy,
+        name: name,
+        url: url,
         offlineUntil: offlineUntil.toISOString(),
         addedOfflineTime: offlineTimeMinutes,
-        reason,
+        reason: reason,
         expired: false,
         graceExpiresAt: null,
         createdAt: now.toISOString()
