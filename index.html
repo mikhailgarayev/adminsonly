@@ -158,7 +158,7 @@
     }
     .progress-fill {
       height: 100%;
-      background-color: #00c2ff; /* Blue for active state */
+      background-color: #00c2ff;
       width: 0%;
       transition: width 0.5s linear;
     }
@@ -263,25 +263,27 @@
     const simoWebhookURL = "https://hooks.slack.com/triggers/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";
 
     // ----------------- 3) Functions to send notifications -----------------
-    // Для ресторанной команды отправляем уведомление только при добавлении заведения.
-    function sendRestaurantNotification(msg) {
+    // Для ресторана отправляем уведомление только при добавлении заведения
+    function sendRestaurantNotification(message) {
       fetch(restaurantWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
+        body: JSON.stringify({ text: message })
       })
       .then(() => console.log("Restaurant notification sent."))
       .catch(err => console.error("Restaurant webhook error:", err));
     }
 
-    // Для SIMO отправляем все подробные уведомления.
-    function sendSimoNotification(msg) {
+    // Для SIMO отправляем все подробные уведомления
+    function sendSimoNotification(message) {
+      // Если необходимо, можно дополнительно обработать сообщение (например, заменить переводы строки)
+      const plainMessage = message.replace(/\n/g, " | ");
       fetch(simoWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
+        body: JSON.stringify({ text: plainMessage })
       })
       .then(() => console.log("SIMO notification sent."))
       .catch(err => console.error("SIMO webhook error:", err));
@@ -295,13 +297,15 @@
       establishment.graceExpiresAt = null;
       establishment.expired = false;
       establishment.extraTimeAdded = false;
+      
       newRef.set(establishment, error => {
         if (!error) {
-          // Отправляем уведомление в ресторанный канал только один раз при добавлении
           const restaurantMsg = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
-          // Отправляем подробное уведомление в SIMO
           const simoMsg = `🍽️ [SIMO] Venue: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
+          
+          // Отправляем уведомление для ресторана только при создании записи
           sendRestaurantNotification(restaurantMsg);
+          // И подробное уведомление для SIMO
           sendSimoNotification(simoMsg);
         } else {
           console.error("Save error:", error);
@@ -309,7 +313,7 @@
       });
     }
 
-    // ----------------- 5) Global store for current data -----------------
+    // ----------------- 5) Global store -----------------
     let currentEstablishments = [];
 
     // ----------------- 6) Subscribe to DB updates -----------------
@@ -333,7 +337,7 @@
       
       establishments.forEach(est => {
         if (est.expired) {
-          // History
+          // Отрисовка истории
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
@@ -363,7 +367,7 @@
           historyTbody.appendChild(tr);
         } else {
           activeCount++;
-          // Active
+          // Отрисовка активных записей
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
@@ -385,8 +389,8 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-
-          // Progress bar & time left cell
+          
+          // Ячейка с прогресс-баром и оставшимся временем
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
           const progressContainer = document.createElement("div");
@@ -402,8 +406,8 @@
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
-
-          // Actions cell
+          
+          // Ячейка с кнопками
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
           tdAction.style.flexDirection = "column";
@@ -428,7 +432,7 @@
           activeTbody.appendChild(tr);
         }
       });
-
+      
       if (activeCount === 0) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
@@ -439,17 +443,20 @@
       }
     }
 
-    // ----------------- 8) Update timers with grace period (10 min) and progress bar -----------------
+    // ----------------- 8) Update timers, grace period, and progress bar -----------------
     function updateTimers() {
       const now = Date.now();
+      
       currentEstablishments.forEach(est => {
         if (est.expired) return;
         const progressBar = document.getElementById(`progressBar-${est.id}`);
         const progressFill = document.getElementById(`progressFill-${est.id}`);
         const timeTextEl = document.getElementById(`timeText-${est.id}`);
         if (!progressBar || !progressFill || !timeTextEl) return;
+        
         const offlineUntilTime = new Date(est.offlineUntil).getTime();
         const createdTime = new Date(est.createdAt).getTime();
+        
         if (offlineUntilTime > now) {
           const remainingMs = offlineUntilTime - now;
           const totalMs = offlineUntilTime - createdTime;
@@ -465,15 +472,14 @@
           if (est.extraTimeAdded) {
             db.ref("establishments/" + est.id).update({ expired: true }, err => {
               if (!err) {
-                sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+                sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time. URL: ${est.url} | By: ${est.addedBy}`);
               }
             });
           } else {
             if (!est.graceExpiresAt) {
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              // Отправляем уведомление только для SIMO
-              sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+              sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started. URL: ${est.url} | By: ${est.addedBy}`);
               est.graceExpiresAt = graceExpires;
               progressFill.style.backgroundColor = "#ffc107";
               progressFill.style.width = "100%";
@@ -490,7 +496,7 @@
               } else {
                 db.ref("establishments/" + est.id).update({ expired: true }, error => {
                   if (!error) {
-                    sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+                    sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired. URL: ${est.url} | By: ${est.addedBy}`);
                   }
                 });
               }
@@ -518,7 +524,7 @@
           extraTimeAdded: true
         }, error => {
           if (!error) {
-            sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
+            sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}. New offline until: ${newOfflineUntil.toLocaleString()} | URL: ${est.url} | By: ${est.addedBy}`);
             db.ref("establishments").once("value", snap => {
               const data = snap.val();
               currentEstablishments = data ? Object.values(data) : [];
@@ -538,7 +544,7 @@
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            sendSimoNotification(`🍽️ [SIMO] ${est.name} marked as expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+            sendSimoNotification(`🍽️ [SIMO] ${est.name} marked as expired. URL: ${est.url} | By: ${est.addedBy}`);
           });
         }
       });
