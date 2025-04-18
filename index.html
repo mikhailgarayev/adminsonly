@@ -465,7 +465,6 @@
           if (est.extraTimeAdded) {
             db.ref("establishments/" + est.id).update({ expired: true }, err => {
               if (!err) {
-                sendRestaurantNotification(""); // Не отправляем уведомление в ресторанный канал
                 sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               }
             });
@@ -474,7 +473,6 @@
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
               // Отправляем уведомление только для SIMO
-              sendRestaurantNotification("");
               sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               est.graceExpiresAt = graceExpires;
               progressFill.style.backgroundColor = "#ffc107";
@@ -492,7 +490,6 @@
               } else {
                 db.ref("establishments/" + est.id).update({ expired: true }, error => {
                   if (!error) {
-                    sendRestaurantNotification("");
                     sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
                   }
                 });
@@ -521,7 +518,6 @@
           extraTimeAdded: true
         }, error => {
           if (!error) {
-            sendRestaurantNotification("");
             sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
             db.ref("establishments").once("value", snap => {
               const data = snap.val();
@@ -542,7 +538,6 @@
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            sendRestaurantNotification("");
             sendSimoNotification(`🍽️ [SIMO] ${est.name} marked as expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
           });
         }
