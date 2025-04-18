@@ -124,7 +124,8 @@
       background: #fff;
       margin-bottom: 20px;
     }
-    th, td {
+    th,
+    td {
       border: 1px solid #eee;
       padding: 12px;
       text-align: center;
@@ -158,7 +159,7 @@
     }
     .progress-fill {
       height: 100%;
-      background-color: #00c2ff;
+      background-color: #00c2ff; /* Синий для обычного статуса */
       width: 0%;
       transition: width 0.5s linear;
     }
@@ -244,9 +245,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. Slack webhook URL (один, который выполняет оба шага)
+    // 2. Single Slack webhook (one that sends both text & simotext)
     const slackWebhookURL = "https://hooks.slack.com/triggers/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";
-    // Функция отправки уведомлений в один вебхук с полями text и simotext
     function sendWebhookToBoth(text, simotext) {
       const payload = { text: text, simotext: simotext };
       fetch(slackWebhookURL, {
@@ -255,7 +255,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
-      .then(() => console.log("Workflow webhook sent with text & simotext."))
+      .then(() => console.log("Webhook sent with text & simotext."))
       .catch(err => console.error("Webhook error:", err));
     }
 
@@ -265,10 +265,12 @@
       establishment.id = newRef.key;
       establishment.createdAt = new Date().toISOString();
       establishment.graceExpiresAt = null;
+      establishment.expired = false;
+      establishment.extraTimeAdded = false;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}`;
-          const simotext = `SIMO: ${establishment.name} is admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
+          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. Next update will be provided upon expiration time.`;
+          const simotext = `SIMO: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
           sendWebhookToBoth(text, simotext);
         } else {
           console.error("Save error:", error);
@@ -278,7 +280,7 @@
 
     let currentEstablishments = [];
 
-    // 4. Subscribe to database updates
+    // 4. Subscribe to dashboard updates
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -288,7 +290,7 @@
       });
     }
 
-    // 5. Render dashboards
+    // 5. Render dashboards (two tables: Active and History)
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
@@ -297,7 +299,6 @@
       let activeCount = 0;
       establishments.forEach(est => {
         if (est.expired) {
-          // Render in History
           const tr = document.createElement("tr");
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
@@ -321,7 +322,6 @@
           historyTbody.appendChild(tr);
         } else {
           activeCount++;
-          // Render active venue
           const tr = document.createElement("tr");
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
@@ -339,8 +339,8 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-          
-          // Progress bar and time left cell
+
+          // Progress bar & time left cell
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
           const progressContainer = document.createElement("div");
@@ -356,7 +356,7 @@
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
-          
+
           // Actions cell
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
@@ -364,12 +364,14 @@
           tdAction.style.gap = "8px";
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
+          addTimeBtn.className = "btn";
           addTimeBtn.addEventListener("click", () => addExtraTime(est.id));
           tdAction.appendChild(addTimeBtn);
-          
           if (est.graceExpiresAt) {
             const setExpBtn = document.createElement("button");
             setExpBtn.textContent = "Set Expired";
+            setExpBtn.className = "btn";
+            setExpBtn.style.backgroundColor = "#dc3545";
             setExpBtn.style.marginTop = "5px";
             setExpBtn.addEventListener("click", () => setExpiredNow(est.id));
             tdAction.appendChild(setExpBtn);
@@ -388,51 +390,74 @@
       }
     }
 
-    // 6. Update timers with grace period (10 min) and progress bar
+    // 6. Update timers with grace period (10 min) + progress bar
     function updateTimers() {
       const now = Date.now();
       currentEstablishments.forEach(est => {
-        if (!est.expired) {
-          const progressBar = document.getElementById(`progressBar-${est.id}`);
-          const progressFill = document.getElementById(`progressFill-${est.id}`);
-          const timeTextEl = document.getElementById(`timeText-${est.id}`);
-          if (!progressBar || !progressFill || !timeTextEl) return;
-          const offlineUntilTime = new Date(est.offlineUntil).getTime();
-          const createdTime = new Date(est.createdAt || new Date()).getTime();
-          
-          if (offlineUntilTime > now) {
-            const remainingMs = offlineUntilTime - now;
-            const totalMs = offlineUntilTime - createdTime;
-            let ratio = remainingMs / totalMs;
-            if (ratio < 0) ratio = 0;
-            if (ratio > 1) ratio = 1;
-            progressFill.style.width = (ratio * 100) + "%";
-            const minutes = Math.floor(remainingMs / 60000);
-            const seconds = Math.floor((remainingMs % 60000) / 1000);
-            timeTextEl.textContent = `${minutes} min ${seconds} sec`;
+        if (est.expired) return;
+        const progressBar = document.getElementById(`progressBar-${est.id}`);
+        const progressFill = document.getElementById(`progressFill-${est.id}`);
+        const timeTextEl = document.getElementById(`timeText-${est.id}`);
+        if (!progressBar || !progressFill || !timeTextEl) return;
+        const offlineUntilTime = new Date(est.offlineUntil).getTime();
+        const createdTime = new Date(est.createdAt || new Date()).getTime();
+        if (offlineUntilTime > now) {
+          // Active period
+          const remainingMs = offlineUntilTime - now;
+          const totalMs = offlineUntilTime - createdTime;
+          let ratio = remainingMs / totalMs;
+          if (ratio < 0) ratio = 0;
+          if (ratio > 1) ratio = 1;
+          // Для активных заведений держим синий цвет
+          progressFill.style.backgroundColor = "#00c2ff";
+          progressFill.style.width = (ratio * 100) + "%";
+          const m = Math.floor(remainingMs / 60000);
+          const s = Math.floor((remainingMs % 60000) / 1000);
+          timeTextEl.textContent = `${m} min ${s} sec`;
+        } else {
+          // Offline time elapsed
+          if (est.extraTimeAdded) {
+            // Если extra time был добавлен, помечаем запись сразу как expired.
+            db.ref("establishments/" + est.id).update({ expired: true }, err => {
+              if (!err) {
+                const text = `🚫 Admins only time ${est.name} expired immediately after extra time.\nWas set offline by: ${est.addedBy}`;
+                const simotext = `🍽️ [SIMO] ${est.name} expired immediately.\nURL: ${est.url} \ Was set offline by: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
+                sendWebhookToBoth(text, simotext);
+              }
+            });
           } else {
             if (!est.graceExpiresAt) {
+              // Start grace period: 10 minutes from now
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              const text = `📢 Admins only time expired for venue: ${est.name}\nYou can add extra time within the next 10 minutes or click "Set Expired" to mark it as expired.\n🔗 ${est.url}\nReason: ${est.reason} / By: ${est.addedBy}`;
-              const simotext = `SIMO: ${est.name} admins only time expired. Add extra time within 10 minutes or press "Set Expired".\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+              const text = `🚫 ${est.name} offline time expired. 10-min grace started. We will add extra time or timer will automatically expire.`;
+              const simotext = `🍽️ [SIMO] Admins only time for ${est.name} expired. \n[WARNING]Grace period (10 min) started. Please, add extra time if needed or set venue back to public.\nURL: ${est.url} \ Was set offline by: ${est.addedBy}`;
               sendWebhookToBoth(text, simotext);
               est.graceExpiresAt = graceExpires;
-              progressFill.style.width = "0%";
+              // Для grace-периода устанавливаем оранжевый прогресс-бар с 100% (начальный) и уменьшаем его
+              progressFill.style.backgroundColor = "#ffc107";
+              progressFill.style.width = "100%";
               timeTextEl.textContent = "Grace: 10 min 0 sec";
             } else {
               const graceExpiresTime = new Date(est.graceExpiresAt).getTime();
               const graceRemaining = graceExpiresTime - now;
               if (graceRemaining > 0) {
-                const minutes = Math.floor(graceRemaining / 60000);
-                const seconds = Math.floor((graceRemaining % 60000) / 1000);
-                progressFill.style.width = "0%";
-                timeTextEl.textContent = `Grace: ${minutes} min ${seconds} sec`;
+                // Рассчитываем % оставшегося grace-времени (от 10 минут)
+                const totalGrace = 10 * 60 * 1000;
+                let ratio = graceRemaining / totalGrace;
+                if (ratio < 0) ratio = 0;
+                if (ratio > 1) ratio = 1;
+                progressFill.style.backgroundColor = "#ffc107";
+                progressFill.style.width = (ratio * 100) + "%";
+                const mm = Math.floor(graceRemaining / 60000);
+                const ss = Math.floor((graceRemaining % 60000) / 1000);
+                timeTextEl.textContent = `Grace: ${mm} min ${ss} sec`;
               } else {
+                // Grace period is over – mark as expired
                 db.ref("establishments/" + est.id).update({ expired: true }, error => {
                   if (!error) {
-                    const text = `📢 Admins only time fully expired for venue: ${est.name}\n🔗 ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
-                    const simotext = `SIMO: ${est.name} is fully expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+                    const text = `🔕 Admins only time for ${est.name} fully expired.\nWas set offline by: ${est.addedBy}`;
+                    const simotext = `🔕 Admins only time for ${est.name} fully expired.\nURL: ${est.url}\nWas set offline by: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
                     sendWebhookToBoth(text, simotext);
                   }
                 });
@@ -453,16 +478,16 @@
         if (!est) return;
         const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
         const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-        // Update record: new offlineUntil, clear graceExpiresAt, update createdAt to reset progress bar
         ref.update({
           offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
           graceExpiresAt: null,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          extraTimeAdded: true
         }, error => {
           if (!error) {
-            const text = `🔕 Added extra time (${additionalTime} min) for venue ${est.name}\nNew offline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason} / By: ${est.addedBy}`;
-            const simotext = `SIMO: Extra ${additionalTime} min for ${est.name}\nOffline until: ${newOfflineUntil.toLocaleString()}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+            const text = `🔕 Extra ${additionalTime} min added for ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}.`;
+            const simotext = `🔕 +${additionalTime} min for ${est.name}.\nOffline until: ${newOfflineUntil.toLocaleString()}.\nURL: ${est.url}\nBy: ${est.addedBy}`;
             sendWebhookToBoth(text, simotext);
             db.ref("establishments").once("value", snap => {
               const data = snap.val();
@@ -483,21 +508,21 @@
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `🔕 Admins only status expired for venue: ${est.name}\n🔗 Venue URL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
-            const simotext = `SIMO: ${est.name} set to expired.\nURL: ${est.url}\nReason: ${est.reason}\nBy: ${est.addedBy}`;
+            const text = `🔕 ${est.name} manually marked as expired.\nBy: ${est.addedBy}`;
+            const simotext = `🔕 ${est.name} forced expired.\nURL: ${est.url}\nBy: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
             sendWebhookToBoth(text, simotext);
           });
         }
       });
     }
 
-    // 9. Initialization: subscribe and update timers
+    // 9. Initialization
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // 10. Form handling
+    // 10. Form Handling
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const addedBy = document.getElementById("addedBy").value;
@@ -516,7 +541,8 @@
         reason: reason,
         expired: false,
         graceExpiresAt: null,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        extraTimeAdded: false
       };
       addEstablishment(establishment);
       e.target.reset();
