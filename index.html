@@ -269,7 +269,7 @@
       establishment.extraTimeAdded = false;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. Next update will be provided upon expiration time.`;
+          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
           const simotext = `SIMO: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\nURL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
           sendWebhookToBoth(text, simotext);
         } else {
@@ -420,7 +420,6 @@
             // Если extra time был добавлен, помечаем запись сразу как expired.
             db.ref("establishments/" + est.id).update({ expired: true }, err => {
               if (!err) {
-                const text = `🚫 Admins only time ${est.name} expired immediately after extra time.\nWas set offline by: ${est.addedBy}`;
                 const simotext = `🍽️ [SIMO] ${est.name} expired immediately.\nURL: ${est.url} \ Was set offline by: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
                 sendWebhookToBoth(text, simotext);
               }
@@ -430,7 +429,6 @@
               // Start grace period: 10 minutes from now
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              const text = `🚫 ${est.name} offline time expired. 10-min grace started. We will add extra time or timer will automatically expire.`;
               const simotext = `🍽️ [SIMO] Admins only time for ${est.name} expired. \n[WARNING]Grace period (10 min) started. Please, add extra time if needed or set venue back to public.\nURL: ${est.url} \ Was set offline by: ${est.addedBy}`;
               sendWebhookToBoth(text, simotext);
               est.graceExpiresAt = graceExpires;
@@ -456,7 +454,6 @@
                 // Grace period is over – mark as expired
                 db.ref("establishments/" + est.id).update({ expired: true }, error => {
                   if (!error) {
-                    const text = `🔕 Admins only time for ${est.name} fully expired.\nWas set offline by: ${est.addedBy}`;
                     const simotext = `🔕 Admins only time for ${est.name} fully expired.\nURL: ${est.url}\nWas set offline by: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
                     sendWebhookToBoth(text, simotext);
                   }
@@ -486,7 +483,6 @@
           extraTimeAdded: true
         }, error => {
           if (!error) {
-            const text = `🔕 Extra ${additionalTime} min added for ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}.`;
             const simotext = `🔕 +${additionalTime} min for ${est.name}.\nOffline until: ${newOfflineUntil.toLocaleString()}.\nURL: ${est.url}\nBy: ${est.addedBy}`;
             sendWebhookToBoth(text, simotext);
             db.ref("establishments").once("value", snap => {
@@ -508,7 +504,6 @@
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            const text = `🔕 ${est.name} manually marked as expired.\nBy: ${est.addedBy}`;
             const simotext = `🔕 ${est.name} forced expired.\nURL: ${est.url}\nBy: ${est.addedBy}\n[WARNING] Do not forget to set venue back to public!`;
             sendWebhookToBoth(text, simotext);
           });
