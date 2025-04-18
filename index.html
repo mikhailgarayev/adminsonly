@@ -21,7 +21,7 @@
       background: url("background.png") no-repeat center center fixed;
       background-size: cover;
       min-height: 100vh;
-      display: flex;
+      display: flex;              
       flex-direction: column;
       align-items: center;
       padding: 20px;
@@ -191,23 +191,18 @@
       <form id="addEstablishmentForm">
         <label>Your e-mail:</label>
         <input type="text" id="addedBy" required>
-        
         <label>Venue Name:</label>
         <input type="text" id="name" required>
-        
         <label>Venue page URL:</label>
         <input type="url" id="url" required>
-        
         <label>Offline time (in minutes):</label>
         <input type="number" id="offlineTime" required min="1">
-        
         <label>Reason for Offline:</label>
         <select id="reason" required>
           <option value="" disabled selected>Select reason</option>
           <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
           <option value="Venue sets itself online">Venue sets itself online</option>
         </select>
-        
         <button type="submit">Add venue</button>
       </form>
     </div>
@@ -263,28 +258,30 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // ----------------- 2) Webhook URLs for separate channels -----------------
+    // ----------------- 2) Webhook URLs -----------------
     const restaurantWebhookURL = "https://hooks.slack.com/triggers/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";
     const simoWebhookURL = "https://hooks.slack.com/triggers/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";
 
-    // ----------------- 3) Send notifications to each channel -----------------
-    function sendRestaurantNotification(message) {
+    // ----------------- 3) Functions to send notifications -----------------
+    // Для ресторанной команды отправляем уведомление только при добавлении заведения.
+    function sendRestaurantNotification(msg) {
       fetch(restaurantWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message })
+        body: JSON.stringify({ text: msg })
       })
       .then(() => console.log("Restaurant notification sent."))
       .catch(err => console.error("Restaurant webhook error:", err));
     }
 
-    function sendSimoNotification(message) {
+    // Для SIMO отправляем все подробные уведомления.
+    function sendSimoNotification(msg) {
       fetch(simoWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message })
+        body: JSON.stringify({ text: msg })
       })
       .then(() => console.log("SIMO notification sent."))
       .catch(err => console.error("SIMO webhook error:", err));
@@ -298,91 +295,89 @@
       establishment.graceExpiresAt = null;
       establishment.expired = false;
       establishment.extraTimeAdded = false;
-      
       newRef.set(establishment, error => {
         if (!error) {
-          // Send short notification to restaurant
+          // Отправляем уведомление в ресторанный канал только один раз при добавлении
           const restaurantMsg = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
-          // Send detailed notification to SIMO
+          // Отправляем подробное уведомление в SIMO
           const simoMsg = `🍽️ [SIMO] Venue: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
-          
           sendRestaurantNotification(restaurantMsg);
           sendSimoNotification(simoMsg);
-
         } else {
           console.error("Save error:", error);
         }
       });
     }
 
-    // ----------------- 5) Global store -----------------
+    // ----------------- 5) Global store for current data -----------------
     let currentEstablishments = [];
 
     // ----------------- 6) Subscribe to DB updates -----------------
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
-        currentEstablishments = data ? Object.values(data) : [];
-        renderDashboards(currentEstablishments);
+        const allEstablishments = data ? Object.values(data) : [];
+        currentEstablishments = allEstablishments;
+        renderDashboards(allEstablishments);
       });
     }
 
-    // ----------------- 7) Render dashboards (Active, History) -----------------
+    // ----------------- 7) Render Dashboards -----------------
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
       
       activeTbody.innerHTML = "";
       historyTbody.innerHTML = "";
-
       let activeCount = 0;
+      
       establishments.forEach(est => {
         if (est.expired) {
-          // ... History ...
-          const tr = document.createElement("tr");
-          const tdName = document.createElement("td");
-          tdName.textContent = est.name;
-          tr.appendChild(tdName);
-
-          const tdBy = document.createElement("td");
-          tdBy.textContent = est.addedBy || "";
-          tr.appendChild(tdBy);
-
-          const tdReason = document.createElement("td");
-          tdReason.textContent = est.reason || "";
-          tr.appendChild(tdReason);
-
-          const tdUrl = document.createElement("td");
-          const link = document.createElement("a");
-          link.href = est.url;
-          link.target = "_blank";
-          link.textContent = "Link";
-          tdUrl.appendChild(link);
-          tr.appendChild(tdUrl);
-
-          const tdOffline = document.createElement("td");
-          tdOffline.textContent = new Date(est.offlineUntil).toLocaleString();
-          tr.appendChild(tdOffline);
-
-          historyTbody.appendChild(tr);
-
-        } else {
-          activeCount++;
-          // ... Active ...
+          // History
           const tr = document.createElement("tr");
           
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
-
+          
           const tdBy = document.createElement("td");
           tdBy.textContent = est.addedBy || "";
           tr.appendChild(tdBy);
-
+          
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
           tr.appendChild(tdReason);
-
+          
+          const tdUrl = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = est.url;
+          link.target = "_blank";
+          link.textContent = "Link";
+          tdUrl.appendChild(link);
+          tr.appendChild(tdUrl);
+          
+          const tdOffline = document.createElement("td");
+          tdOffline.textContent = new Date(est.offlineUntil).toLocaleString();
+          tr.appendChild(tdOffline);
+          
+          historyTbody.appendChild(tr);
+        } else {
+          activeCount++;
+          // Active
+          const tr = document.createElement("tr");
+          
+          const tdName = document.createElement("td");
+          tdName.textContent = est.name;
+          tr.appendChild(tdName);
+          
+          const tdBy = document.createElement("td");
+          tdBy.textContent = est.addedBy || "";
+          tr.appendChild(tdBy);
+          
+          const tdReason = document.createElement("td");
+          tdReason.textContent = est.reason || "";
+          tr.appendChild(tdReason);
+          
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -391,49 +386,45 @@
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
 
-          // Timer cell
+          // Progress bar & time left cell
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
           const progressContainer = document.createElement("div");
           progressContainer.className = "progress-container";
           progressContainer.id = `progressBar-${est.id}`;
-
           const progressFill = document.createElement("div");
           progressFill.className = "progress-fill";
           progressFill.id = `progressFill-${est.id}`;
           progressContainer.appendChild(progressFill);
-
           const timeText = document.createElement("div");
           timeText.className = "time-text";
           timeText.id = `timeText-${est.id}`;
-
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
 
-          // Actions
+          // Actions cell
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
           tdAction.style.flexDirection = "column";
           tdAction.style.gap = "8px";
-
+          
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
           addTimeBtn.className = "btn";
-          addTimeBtn.onclick = () => addExtraTime(est.id);
+          addTimeBtn.addEventListener("click", () => addExtraTime(est.id));
           tdAction.appendChild(addTimeBtn);
-
+          
           if (est.graceExpiresAt) {
             const setExpBtn = document.createElement("button");
             setExpBtn.textContent = "Set Expired";
             setExpBtn.className = "btn";
             setExpBtn.style.backgroundColor = "#dc3545";
             setExpBtn.style.marginTop = "5px";
-            setExpBtn.onclick = () => setExpiredNow(est.id);
+            setExpBtn.addEventListener("click", () => setExpiredNow(est.id));
             tdAction.appendChild(setExpBtn);
           }
           tr.appendChild(tdAction);
-
           activeTbody.appendChild(tr);
         }
       });
@@ -448,22 +439,18 @@
       }
     }
 
-    // ----------------- 8) Timers / Grace logic / Progress bar -----------------
+    // ----------------- 8) Update timers with grace period (10 min) and progress bar -----------------
     function updateTimers() {
       const now = Date.now();
       currentEstablishments.forEach(est => {
         if (est.expired) return;
-
         const progressBar = document.getElementById(`progressBar-${est.id}`);
         const progressFill = document.getElementById(`progressFill-${est.id}`);
         const timeTextEl = document.getElementById(`timeText-${est.id}`);
         if (!progressBar || !progressFill || !timeTextEl) return;
-
         const offlineUntilTime = new Date(est.offlineUntil).getTime();
         const createdTime = new Date(est.createdAt).getTime();
-
         if (offlineUntilTime > now) {
-          // Active
           const remainingMs = offlineUntilTime - now;
           const totalMs = offlineUntilTime - createdTime;
           let ratio = remainingMs / totalMs;
@@ -474,35 +461,26 @@
           const m = Math.floor(remainingMs / 60000);
           const s = Math.floor((remainingMs % 60000) / 1000);
           timeTextEl.textContent = `${m} min ${s} sec`;
-
         } else {
-          // offline time has expired
           if (est.extraTimeAdded) {
-            // If extra time was added, no grace period
-            db.ref(`establishments/${est.id}`).update({ expired: true }, err => {
+            db.ref("establishments/" + est.id).update({ expired: true }, err => {
               if (!err) {
-                sendRestaurantNotification("");
+                sendRestaurantNotification(""); // Не отправляем уведомление в ресторанный канал
                 sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               }
             });
           } else {
-            // Possibly Grace
             if (!est.graceExpiresAt) {
-              // Start grace
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
-              db.ref(`establishments/${est.id}`).update({ graceExpiresAt: graceExpires }, error => {
-                if (!error) {
-                  sendRestaurantNotification("");
-                  sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
-                }
-              });
+              db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
+              // Отправляем уведомление только для SIMO
+              sendRestaurantNotification("");
+              sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               est.graceExpiresAt = graceExpires;
-              progressFill.style.backgroundColor = "#ffc107"; 
+              progressFill.style.backgroundColor = "#ffc107";
               progressFill.style.width = "100%";
               timeTextEl.textContent = "Grace: 10 min 0 sec";
-
             } else {
-              // Grace is active
               const graceExpiresTime = new Date(est.graceExpiresAt).getTime();
               const graceRemaining = graceExpiresTime - now;
               if (graceRemaining > 0) {
@@ -512,8 +490,8 @@
                 progressFill.style.width = ((graceRemaining / (10 * 60 * 1000)) * 100) + "%";
                 timeTextEl.textContent = `Grace: ${mm} min ${ss} sec`;
               } else {
-                db.ref(`establishments/${est.id}`).update({ expired: true }, err => {
-                  if (!err) {
+                db.ref("establishments/" + est.id).update({ expired: true }, error => {
+                  if (!error) {
                     sendRestaurantNotification("");
                     sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
                   }
@@ -529,15 +507,12 @@
     function addExtraTime(id) {
       const additionalTime = prompt("Enter additional time (in minutes):");
       if (!additionalTime) return;
-
-      const ref = db.ref(`establishments/${id}`);
-      ref.once("value", snap => {
-        const est = snap.val();
+      const ref = db.ref("establishments/" + id);
+      ref.once("value", snapshot => {
+        const est = snapshot.val();
         if (!est) return;
-
         const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
         const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
-
         ref.update({
           offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
@@ -548,8 +523,8 @@
           if (!error) {
             sendRestaurantNotification("");
             sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
-            db.ref("establishments").once("value", snapshot => {
-              const data = snapshot.val();
+            db.ref("establishments").once("value", snap => {
+              const data = snap.val();
               currentEstablishments = data ? Object.values(data) : [];
               renderDashboards(currentEstablishments);
             });
@@ -562,7 +537,7 @@
 
     // ----------------- 10) Set Expired Now -----------------
     function setExpiredNow(id) {
-      const ref = db.ref(`establishments/${id}`);
+      const ref = db.ref("establishments/" + id);
       ref.update({ expired: true }, error => {
         if (!error) {
           ref.once("value", snap => {
@@ -583,16 +558,13 @@
     // ----------------- 12) Form Handling -----------------
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
-
       const addedBy = document.getElementById("addedBy").value;
       const name = document.getElementById("name").value;
       const url = document.getElementById("url").value;
       const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
       const reason = document.getElementById("reason").value;
-
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
-
       const establishment = {
         addedBy: addedBy,
         name: name,
@@ -605,7 +577,6 @@
         createdAt: now.toISOString(),
         extraTimeAdded: false
       };
-
       addEstablishment(establishment);
       e.target.reset();
     });
