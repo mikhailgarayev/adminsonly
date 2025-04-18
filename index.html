@@ -158,7 +158,7 @@
     }
     .progress-fill {
       height: 100%;
-      background-color: #00c2ff; /* Blue for active */
+      background-color: #00c2ff; /* Blue for active state */
       width: 0%;
       transition: width 0.5s linear;
     }
@@ -258,24 +258,34 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. Single Slack webhook URL (one webhook for two steps)
-    const slackWebhookURL = "https://hooks.slack.com/triggers/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";
+    // 2. Webhook URLs
+    const restaurantWebhookURL = "https://hooks.slack.com/triggers/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";
+    const simoWebhookURL = "https://hooks.slack.com/triggers/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";
 
-    // Функция отправки уведомлений: для ресторанной команды (text) уведомление при добавлении заведения,
-    // а все последующие обновления идут только в simotext.
-    function sendWebhookToBoth(text, simotext) {
-      const payload = { text: text, simotext: simotext };
-      fetch(slackWebhookURL, {
+    // 3. Functions to send notifications on each channel
+    function sendRestaurantNotification(msg) {
+      fetch(restaurantWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ text: msg })
       })
-      .then(() => console.log("Webhook sent with text & simotext."))
-      .catch(err => console.error("Webhook error:", err));
+      .then(() => console.log("Restaurant notification sent."))
+      .catch(err => console.error("Restaurant webhook error:", err));
     }
 
-    // 3. Add venue function – при добавлении заведения уведомление для ресторана отправляется в text
+    function sendSimoNotification(msg) {
+      fetch(simoWebhookURL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: msg })
+      })
+      .then(() => console.log("SIMO notification sent."))
+      .catch(err => console.error("SIMO webhook error:", err));
+    }
+
+    // 4. Add venue function (при добавлении заведения уведомление для ресторана отправляется, а для SIMO – подробное)
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
@@ -285,9 +295,10 @@
       establishment.extraTimeAdded = false;
       newRef.set(establishment, error => {
         if (!error) {
-          const text = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
-          const simotext = `🍽️ [SIMO] Venue: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
-          sendWebhookToBoth(text, simotext);
+          const restMsg = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
+          const simoMsg = `🍽️ [SIMO] Venue: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
+          sendRestaurantNotification(restMsg);
+          sendSimoNotification(simoMsg);
         } else {
           console.error("Save error:", error);
         }
@@ -296,7 +307,7 @@
 
     let currentEstablishments = [];
 
-    // 4. Subscribe to DB updates
+    // 5. Subscribe to DB updates
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
@@ -306,7 +317,7 @@
       });
     }
 
-    // 5. Render dashboards – разделяем таблицы Active и History
+    // 6. Render dashboards (Active and History tables)
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
@@ -355,7 +366,8 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-          // Progress bar and time left cell
+          
+          // Progress bar & time left
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
           const progressContainer = document.createElement("div");
@@ -371,6 +383,7 @@
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
+          
           // Actions cell
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
@@ -404,7 +417,7 @@
       }
     }
 
-    // 6. Update timers with grace period (10 min) and progress bar
+    // 7. Update timers with grace period (10 min) and progress bar
     function updateTimers() {
       const now = Date.now();
       currentEstablishments.forEach(est => {
@@ -430,17 +443,19 @@
           if (est.extraTimeAdded) {
             db.ref("establishments/" + est.id).update({ expired: true }, err => {
               if (!err) {
-                sendWebhookToBoth("", `🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+                sendRestaurantNotification(""); // Не отправляем ресторанное уведомление
+                sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               }
             });
           } else {
             if (!est.graceExpiresAt) {
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
               db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              // Отправляем уведомление только в simotext (restaurant team не получает уведомление при grace)
-              sendWebhookToBoth("", `🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+              // Отправляем уведомление только для SIMO
+              sendRestaurantNotification("");
+              sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               est.graceExpiresAt = graceExpires;
-              progressFill.style.backgroundColor = "#ffc107";  // Оранжевый цвет для grace
+              progressFill.style.backgroundColor = "#ffc107";
               progressFill.style.width = "100%";
               timeTextEl.textContent = "Grace: 10 min 0 sec";
             } else {
@@ -455,7 +470,8 @@
               } else {
                 db.ref("establishments/" + est.id).update({ expired: true }, error => {
                   if (!error) {
-                    sendWebhookToBoth("", `🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+                    sendRestaurantNotification("");
+                    sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
                   }
                 });
               }
@@ -465,7 +481,7 @@
       });
     }
 
-    // 7. Add Extra Time
+    // 8. Add Extra Time
     function addExtraTime(id) {
       const additionalTime = prompt("Enter additional time (in minutes):");
       if (!additionalTime) return;
@@ -483,7 +499,8 @@
           extraTimeAdded: true
         }, error => {
           if (!error) {
-            sendWebhookToBoth("", `🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
+            sendRestaurantNotification("");
+            sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
             db.ref("establishments").once("value", snap => {
               const data = snap.val();
               currentEstablishments = data ? Object.values(data) : [];
@@ -496,26 +513,52 @@
       });
     }
 
-    // 8. Set Expired Now
+    // 9. Set Expired Now
     function setExpiredNow(id) {
       const ref = db.ref("establishments/" + id);
       ref.update({ expired: true }, error => {
         if (!error) {
           ref.once("value", snap => {
             const est = snap.val();
-            sendWebhookToBoth("", `🍽️ [SIMO] ${est.name} marked as expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+            sendRestaurantNotification("");
+            sendSimoNotification(`🍽️ [SIMO] ${est.name} marked as expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
           });
         }
       });
     }
 
-    // 9. Initialization
+    // 10. Functions to send notifications for each channel separately:
+    function sendRestaurantNotification(msg) {
+      fetch(restaurantWebhookURL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: msg })
+      })
+      .then(() => console.log("Restaurant notification sent."))
+      .catch(err => console.error("Restaurant webhook error:", err));
+    }
+    function sendSimoNotification(msg) {
+      fetch(simoWebhookURL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: msg })
+      })
+      .then(() => console.log("SIMO notification sent."))
+      .catch(err => console.error("SIMO webhook error:", err));
+    }
+    //  Define webhook URLs for separate channels:
+    const restaurantWebhookURL = "https://hooks.slack.com/triggers/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";
+    const simoWebhookURL = "https://hooks.slack.com/triggers/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";
+
+    // 11. Initialization: subscribe & update timers
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // 10. Form Handling
+    // 12. Form Handling
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const addedBy = document.getElementById("addedBy").value;
