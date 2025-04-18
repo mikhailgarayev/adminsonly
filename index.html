@@ -21,7 +21,7 @@
       background: url("background.png") no-repeat center center fixed;
       background-size: cover;
       min-height: 100vh;
-      display: flex;              
+      display: flex;
       flex-direction: column;
       align-items: center;
       padding: 20px;
@@ -191,18 +191,23 @@
       <form id="addEstablishmentForm">
         <label>Your e-mail:</label>
         <input type="text" id="addedBy" required>
+        
         <label>Venue Name:</label>
         <input type="text" id="name" required>
+        
         <label>Venue page URL:</label>
         <input type="url" id="url" required>
+        
         <label>Offline time (in minutes):</label>
         <input type="number" id="offlineTime" required min="1">
+        
         <label>Reason for Offline:</label>
         <select id="reason" required>
           <option value="" disabled selected>Select reason</option>
           <option value="Integration issues / Tech issues">Integration issues / Tech issues</option>
           <option value="Venue sets itself online">Venue sets itself online</option>
         </select>
+        
         <button type="submit">Add venue</button>
       </form>
     </div>
@@ -245,7 +250,7 @@
   </div>
 
   <script>
-    // 1. Firebase initialization
+    // ----------------- 1) Firebase initialization -----------------
     const firebaseConfig = {
       apiKey: "AIzaSyBaQYzQmld5VNA_wSI8nDtqENN0TgcNqeA",
       authDomain: "adminsonly.firebaseapp.com",
@@ -258,34 +263,34 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. Webhook URLs
+    // ----------------- 2) Webhook URLs for separate channels -----------------
     const restaurantWebhookURL = "https://hooks.slack.com/triggers/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";
     const simoWebhookURL = "https://hooks.slack.com/triggers/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";
 
-    // 3. Functions to send notifications on each channel
-    function sendRestaurantNotification(msg) {
+    // ----------------- 3) Send notifications to each channel -----------------
+    function sendRestaurantNotification(message) {
       fetch(restaurantWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
+        body: JSON.stringify({ text: message })
       })
       .then(() => console.log("Restaurant notification sent."))
       .catch(err => console.error("Restaurant webhook error:", err));
     }
 
-    function sendSimoNotification(msg) {
+    function sendSimoNotification(message) {
       fetch(simoWebhookURL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
+        body: JSON.stringify({ text: message })
       })
       .then(() => console.log("SIMO notification sent."))
       .catch(err => console.error("SIMO webhook error:", err));
     }
 
-    // 4. Add venue function (при добавлении заведения уведомление для ресторана отправляется, а для SIMO – подробное)
+    // ----------------- 4) Add Venue Function -----------------
     function addEstablishment(establishment) {
       const newRef = db.ref("establishments").push();
       establishment.id = newRef.key;
@@ -293,49 +298,60 @@
       establishment.graceExpiresAt = null;
       establishment.expired = false;
       establishment.extraTimeAdded = false;
+      
       newRef.set(establishment, error => {
         if (!error) {
-          const restMsg = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
+          // Send short notification to restaurant
+          const restaurantMsg = `📢 The ${establishment.name} venue was set admins only until ${new Date(establishment.offlineUntil).toLocaleString()} by ${establishment.addedBy}\nReason: ${establishment.reason}. For further updates please, use https://wo.lt/adminsonly`;
+          // Send detailed notification to SIMO
           const simoMsg = `🍽️ [SIMO] Venue: ${establishment.name} is set admins only until ${new Date(establishment.offlineUntil).toLocaleString()}\n🔗 URL: ${establishment.url}\nReason: ${establishment.reason}\nBy: ${establishment.addedBy}`;
-          sendRestaurantNotification(restMsg);
+          
+          sendRestaurantNotification(restaurantMsg);
           sendSimoNotification(simoMsg);
+
         } else {
           console.error("Save error:", error);
         }
       });
     }
 
+    // ----------------- 5) Global store -----------------
     let currentEstablishments = [];
 
-    // 5. Subscribe to DB updates
+    // ----------------- 6) Subscribe to DB updates -----------------
     function subscribeToDashboard() {
       db.ref("establishments").on("value", snapshot => {
         const data = snapshot.val();
-        const allEstablishments = data ? Object.values(data) : [];
-        currentEstablishments = allEstablishments;
-        renderDashboards(allEstablishments);
+        currentEstablishments = data ? Object.values(data) : [];
+        renderDashboards(currentEstablishments);
       });
     }
 
-    // 6. Render dashboards (Active and History tables)
+    // ----------------- 7) Render dashboards (Active, History) -----------------
     function renderDashboards(establishments) {
       const activeTbody = document.getElementById("activeTable").querySelector("tbody");
       const historyTbody = document.getElementById("historyTable").querySelector("tbody");
+      
       activeTbody.innerHTML = "";
       historyTbody.innerHTML = "";
+
       let activeCount = 0;
       establishments.forEach(est => {
         if (est.expired) {
+          // ... History ...
           const tr = document.createElement("tr");
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
+
           const tdBy = document.createElement("td");
           tdBy.textContent = est.addedBy || "";
           tr.appendChild(tdBy);
+
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
           tr.appendChild(tdReason);
+
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -343,22 +359,30 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
+
           const tdOffline = document.createElement("td");
           tdOffline.textContent = new Date(est.offlineUntil).toLocaleString();
           tr.appendChild(tdOffline);
+
           historyTbody.appendChild(tr);
+
         } else {
           activeCount++;
+          // ... Active ...
           const tr = document.createElement("tr");
+          
           const tdName = document.createElement("td");
           tdName.textContent = est.name;
           tr.appendChild(tdName);
+
           const tdBy = document.createElement("td");
           tdBy.textContent = est.addedBy || "";
           tr.appendChild(tdBy);
+
           const tdReason = document.createElement("td");
           tdReason.textContent = est.reason || "";
           tr.appendChild(tdReason);
+
           const tdUrl = document.createElement("td");
           const link = document.createElement("a");
           link.href = est.url;
@@ -366,47 +390,54 @@
           link.textContent = "Link";
           tdUrl.appendChild(link);
           tr.appendChild(tdUrl);
-          
-          // Progress bar & time left
+
+          // Timer cell
           const tdTimer = document.createElement("td");
           tdTimer.style.verticalAlign = "middle";
           const progressContainer = document.createElement("div");
           progressContainer.className = "progress-container";
           progressContainer.id = `progressBar-${est.id}`;
+
           const progressFill = document.createElement("div");
           progressFill.className = "progress-fill";
           progressFill.id = `progressFill-${est.id}`;
           progressContainer.appendChild(progressFill);
+
           const timeText = document.createElement("div");
           timeText.className = "time-text";
           timeText.id = `timeText-${est.id}`;
+
           tdTimer.appendChild(progressContainer);
           tdTimer.appendChild(timeText);
           tr.appendChild(tdTimer);
-          
-          // Actions cell
+
+          // Actions
           const tdAction = document.createElement("td");
           tdAction.style.display = "flex";
           tdAction.style.flexDirection = "column";
           tdAction.style.gap = "8px";
+
           const addTimeBtn = document.createElement("button");
           addTimeBtn.textContent = "Add Extra Time";
           addTimeBtn.className = "btn";
-          addTimeBtn.addEventListener("click", () => addExtraTime(est.id));
+          addTimeBtn.onclick = () => addExtraTime(est.id);
           tdAction.appendChild(addTimeBtn);
+
           if (est.graceExpiresAt) {
             const setExpBtn = document.createElement("button");
             setExpBtn.textContent = "Set Expired";
             setExpBtn.className = "btn";
             setExpBtn.style.backgroundColor = "#dc3545";
             setExpBtn.style.marginTop = "5px";
-            setExpBtn.addEventListener("click", () => setExpiredNow(est.id));
+            setExpBtn.onclick = () => setExpiredNow(est.id);
             tdAction.appendChild(setExpBtn);
           }
           tr.appendChild(tdAction);
+
           activeTbody.appendChild(tr);
         }
       });
+
       if (activeCount === 0) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
@@ -417,18 +448,22 @@
       }
     }
 
-    // 7. Update timers with grace period (10 min) and progress bar
+    // ----------------- 8) Timers / Grace logic / Progress bar -----------------
     function updateTimers() {
       const now = Date.now();
       currentEstablishments.forEach(est => {
         if (est.expired) return;
+
         const progressBar = document.getElementById(`progressBar-${est.id}`);
         const progressFill = document.getElementById(`progressFill-${est.id}`);
         const timeTextEl = document.getElementById(`timeText-${est.id}`);
         if (!progressBar || !progressFill || !timeTextEl) return;
+
         const offlineUntilTime = new Date(est.offlineUntil).getTime();
-        const createdTime = new Date(est.createdAt || new Date()).getTime();
+        const createdTime = new Date(est.createdAt).getTime();
+
         if (offlineUntilTime > now) {
+          // Active
           const remainingMs = offlineUntilTime - now;
           const totalMs = offlineUntilTime - createdTime;
           let ratio = remainingMs / totalMs;
@@ -439,26 +474,35 @@
           const m = Math.floor(remainingMs / 60000);
           const s = Math.floor((remainingMs % 60000) / 1000);
           timeTextEl.textContent = `${m} min ${s} sec`;
+
         } else {
+          // offline time has expired
           if (est.extraTimeAdded) {
-            db.ref("establishments/" + est.id).update({ expired: true }, err => {
+            // If extra time was added, no grace period
+            db.ref(`establishments/${est.id}`).update({ expired: true }, err => {
               if (!err) {
-                sendRestaurantNotification(""); // Не отправляем ресторанное уведомление
+                sendRestaurantNotification("");
                 sendSimoNotification(`🍽️ [SIMO] ${est.name} expired immediately after extra time.\nURL: ${est.url}\nBy: ${est.addedBy}`);
               }
             });
           } else {
+            // Possibly Grace
             if (!est.graceExpiresAt) {
+              // Start grace
               const graceExpires = new Date(now + 10 * 60 * 1000).toISOString();
-              db.ref("establishments/" + est.id).update({ graceExpiresAt: graceExpires });
-              // Отправляем уведомление только для SIMO
-              sendRestaurantNotification("");
-              sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+              db.ref(`establishments/${est.id}`).update({ graceExpiresAt: graceExpires }, error => {
+                if (!error) {
+                  sendRestaurantNotification("");
+                  sendSimoNotification(`🍽️ [SIMO] ${est.name} offline expired. Grace period (10 min) started.\nURL: ${est.url}\nBy: ${est.addedBy}`);
+                }
+              });
               est.graceExpiresAt = graceExpires;
-              progressFill.style.backgroundColor = "#ffc107";
+              progressFill.style.backgroundColor = "#ffc107"; 
               progressFill.style.width = "100%";
               timeTextEl.textContent = "Grace: 10 min 0 sec";
+
             } else {
+              // Grace is active
               const graceExpiresTime = new Date(est.graceExpiresAt).getTime();
               const graceRemaining = graceExpiresTime - now;
               if (graceRemaining > 0) {
@@ -468,8 +512,8 @@
                 progressFill.style.width = ((graceRemaining / (10 * 60 * 1000)) * 100) + "%";
                 timeTextEl.textContent = `Grace: ${mm} min ${ss} sec`;
               } else {
-                db.ref("establishments/" + est.id).update({ expired: true }, error => {
-                  if (!error) {
+                db.ref(`establishments/${est.id}`).update({ expired: true }, err => {
+                  if (!err) {
                     sendRestaurantNotification("");
                     sendSimoNotification(`🍽️ [SIMO] ${est.name} fully expired.\nURL: ${est.url}\nBy: ${est.addedBy}`);
                   }
@@ -481,16 +525,19 @@
       });
     }
 
-    // 8. Add Extra Time
+    // ----------------- 9) Add Extra Time -----------------
     function addExtraTime(id) {
       const additionalTime = prompt("Enter additional time (in minutes):");
       if (!additionalTime) return;
-      const ref = db.ref("establishments/" + id);
-      ref.once("value", snapshot => {
-        const est = snapshot.val();
+
+      const ref = db.ref(`establishments/${id}`);
+      ref.once("value", snap => {
+        const est = snap.val();
         if (!est) return;
+
         const additionalMs = parseInt(additionalTime, 10) * 60 * 1000;
         const newOfflineUntil = new Date(new Date(est.offlineUntil).getTime() + additionalMs);
+
         ref.update({
           offlineUntil: newOfflineUntil.toISOString(),
           expired: false,
@@ -501,8 +548,8 @@
           if (!error) {
             sendRestaurantNotification("");
             sendSimoNotification(`🍽️ [SIMO] Extra ${additionalTime} min added to ${est.name}.\nNew offline until: ${newOfflineUntil.toLocaleString()}\nURL: ${est.url}\nBy: ${est.addedBy}`);
-            db.ref("establishments").once("value", snap => {
-              const data = snap.val();
+            db.ref("establishments").once("value", snapshot => {
+              const data = snapshot.val();
               currentEstablishments = data ? Object.values(data) : [];
               renderDashboards(currentEstablishments);
             });
@@ -513,9 +560,9 @@
       });
     }
 
-    // 9. Set Expired Now
+    // ----------------- 10) Set Expired Now -----------------
     function setExpiredNow(id) {
-      const ref = db.ref("establishments/" + id);
+      const ref = db.ref(`establishments/${id}`);
       ref.update({ expired: true }, error => {
         if (!error) {
           ref.once("value", snap => {
@@ -527,47 +574,25 @@
       });
     }
 
-    // 10. Functions to send notifications for each channel separately:
-    function sendRestaurantNotification(msg) {
-      fetch(restaurantWebhookURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
-      })
-      .then(() => console.log("Restaurant notification sent."))
-      .catch(err => console.error("Restaurant webhook error:", err));
-    }
-    function sendSimoNotification(msg) {
-      fetch(simoWebhookURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg })
-      })
-      .then(() => console.log("SIMO notification sent."))
-      .catch(err => console.error("SIMO webhook error:", err));
-    }
-    //  Define webhook URLs for separate channels:
-    const restaurantWebhookURL = "https://hooks.slack.com/triggers/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";
-    const simoWebhookURL = "https://hooks.slack.com/triggers/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";
-
-    // 11. Initialization: subscribe & update timers
+    // ----------------- 11) Initialization -----------------
     window.addEventListener("load", () => {
       subscribeToDashboard();
       setInterval(updateTimers, 1000);
     });
 
-    // 12. Form Handling
+    // ----------------- 12) Form Handling -----------------
     document.getElementById("addEstablishmentForm").addEventListener("submit", function(e) {
       e.preventDefault();
+
       const addedBy = document.getElementById("addedBy").value;
       const name = document.getElementById("name").value;
       const url = document.getElementById("url").value;
       const offlineTimeMinutes = parseInt(document.getElementById("offlineTime").value, 10);
       const reason = document.getElementById("reason").value;
+
       const now = new Date();
       const offlineUntil = new Date(now.getTime() + offlineTimeMinutes * 60 * 1000);
+
       const establishment = {
         addedBy: addedBy,
         name: name,
@@ -580,6 +605,7 @@
         createdAt: now.toISOString(),
         extraTimeAdded: false
       };
+
       addEstablishment(establishment);
       e.target.reset();
     });
